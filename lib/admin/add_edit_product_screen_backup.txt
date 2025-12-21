@@ -1,0 +1,309 @@
+import 'package:flutter/material.dart';
+import '../models/product.dart';
+import '../models/category.dart';
+import '../services/api_service.dart';
+import 'package:image_picker/image_picker.dart';
+
+class AddEditProductScreen extends StatefulWidget {
+  static const routeName = '/add-edit-product';
+  final Product? product;
+
+  const AddEditProductScreen({super.key, this.product});
+
+  @override
+  State<AddEditProductScreen> createState() => _AddEditProductScreenState();
+}
+
+class _AddEditProductScreenState extends State<AddEditProductScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _api = const ApiService();
+
+  // Use controllers for better state management in forms
+  late final TextEditingController _nameController;
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _priceController;
+  late final TextEditingController _notesController;
+
+  String? _categoryId;
+  bool _isFeatured = false;
+  bool _isLoading = false;
+  XFile? _pickedImage;
+  String? _imageUrl; // existing or uploaded
+  Future<List<Category>>? _categoriesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    final product = widget.product;
+    _nameController = TextEditingController(text: product?.name ?? '');
+    _descriptionController = TextEditingController(text: product?.description ?? '');
+    _priceController = TextEditingController(text: product?.price.toString() ?? '0.0');
+    _notesController = TextEditingController(text: product?.fragranceNotes.join(', ') ?? '');
+    _categoryId = product?.categoryId;
+    _isFeatured = product?.isFeatured ?? false;
+    _imageUrl = product?.imageUrl;
+    _categoriesFuture = _api.fetchCategories();
+  }
+
+  @override
+  void dispose() {
+    // Dispose controllers to free up resources
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _priceController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveForm() async {
+    // First, validate the form
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    // This triggers the onSaved callbacks
+    _formKey.currentState!.save();
+
+    // Set loading state
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final isUpdating = widget.product != null;
+      
+      // Upload picked image if any
+      String? finalImageUrl = _imageUrl;
+      if (_pickedImage != null) {
+        final uploaded = await _api.uploadImage(_pickedImage!);
+        if (uploaded != null) finalImageUrl = uploaded;
+      }
+
+      if (isUpdating) {
+        await _api.updateProduct(
+          id: widget.product!.id,
+          categoryId: _categoryId!,
+          name: _nameController.text,
+          description: _descriptionController.text,
+          price: double.tryParse(_priceController.text) ?? 0.0,
+          isFeatured: _isFeatured,
+          mainImageUrl: finalImageUrl,
+          fragranceNotes: _notesController.text
+              .split(',')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList(),
+        );
+      } else {
+        await _api.createProduct(
+          categoryId: _categoryId!,
+          name: _nameController.text,
+          description: _descriptionController.text,
+          price: double.tryParse(_priceController.text) ?? 0.0,
+          isFeatured: _isFeatured,
+          mainImageUrl: finalImageUrl,
+          fragranceNotes: _notesController.text
+              .split(',')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList(),
+        );
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Product ${isUpdating ? 'updated' : 'saved'} successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Pop the screen only on success
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      // Show error message if something goes wrong
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('An error occurred: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
+      // ALWAYS turn off the loading indicator in the finally block
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.product == null ? 'Add Product' : 'Edit Product'),
+        actions: [
+          // Avoid saving if already loading
+          if (!_isLoading)
+            IconButton(
+              onPressed: _saveForm,
+              tooltip: 'Save Product',
+              icon: const Icon(Icons.save),
+            ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Saving product...'),
+                ],
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(labelText: 'Name'),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a name.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _descriptionController,
+                        decoration: const InputDecoration(labelText: 'Description'),
+                        maxLines: 3,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _priceController,
+                        decoration: const InputDecoration(labelText: 'Price'),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        validator: (value) {
+                          if (value == null || double.tryParse(value) == null) {
+                            return 'Please enter a valid price.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      _buildCategoryDropdown(),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Fragrance Notes',
+                          hintText: 'e.g., Citrus, Woody, Floral',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildImagePickerRow(),
+                      const SizedBox(height: 16),
+                      SwitchListTile(
+                        title: const Text('Featured Product'),
+                        subtitle: const Text('Show this product on the home screen.'),
+                        value: _isFeatured,
+                        onChanged: (value) {
+                          setState(() {
+                            _isFeatured = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _saveForm,
+                          icon: const Icon(Icons.save),
+                          label: Text(widget.product == null ? 'Save Product' : 'Update Product'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildCategoryDropdown() {
+    return FutureBuilder<List<Category>>(
+      future: _categoriesFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Text('Error: ${snapshot.error}');
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: Text('Loading categories...'));
+        }
+        final categories = snapshot.data!;
+        if (categories.isEmpty) {
+          return const Text('No categories found. Please add one first.');
+        }
+
+        // If the current _categoryId is not in the list, set it to null
+        // to avoid showing an invalid value in the dropdown.
+        final categoryIds = categories.map((c) => c.id).toList();
+        if (_categoryId != null && !categoryIds.contains(_categoryId)) {
+          _categoryId = null;
+        }
+
+        return DropdownButtonFormField<String>(
+          value: _categoryId,
+          decoration: const InputDecoration(labelText: 'Category'),
+          items: categories.map((category) {
+            return DropdownMenuItem(
+              value: category.id,
+              child: Text(category.name),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _categoryId = value;
+            });
+          },
+          validator: (value) => value == null ? 'Please select a category.' : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildImagePickerRow() {
+    return Row(
+      children: [
+        ElevatedButton.icon(
+          onPressed: () async {
+            final picker = ImagePicker();
+            final img = await picker.pickImage(source: ImageSource.gallery);
+            if (img != null) {
+              setState(() {
+                _pickedImage = img;
+              });
+            }
+          },
+          icon: const Icon(Icons.image),
+          label: const Text('Pick Product Image (optional)'),
+        ),
+        const SizedBox(width: 12),
+        if (_pickedImage != null || (_imageUrl ?? '').isNotEmpty) const Text('Image selected'),
+      ],
+    );
+  }
+}

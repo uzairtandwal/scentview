@@ -1,0 +1,354 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
+import '../services/orders_service.dart';
+import '../services/firestore_service.dart';
+import '../models/order.dart';
+import 'products_screen.dart';
+import 'categories_screen.dart';
+import 'banners_screen.dart';
+
+class AdminHomeScreen extends StatefulWidget {
+  static const routeName = '/admin-home';
+
+  const AdminHomeScreen({super.key});
+
+  @override
+  State<AdminHomeScreen> createState() => _AdminHomeScreenState();
+}
+
+class _AdminHomeScreenState extends State<AdminHomeScreen> {
+  int _selectedIndex = 0;
+
+  final PageController _pageController = PageController();
+
+  final List<Widget> _screens = const [
+    DashboardContent(),
+    ProductsScreen(),
+    CategoriesScreen(),
+    BannersScreen(),
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+      _pageController.animateToPage(index, duration: const Duration(milliseconds: 300), curve: Curves.ease);
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const List<String> screenTitles = [
+      'Admin Dashboard',
+      'Product Management',
+      'Category Management',
+      'Banner Management',
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(screenTitles[_selectedIndex]),
+        actions: [
+          if (_selectedIndex == 0)
+            IconButton(
+              tooltip: 'Add dummy paid order',
+              icon: const Icon(Icons.add_card_rounded),
+              onPressed: () async {
+                final fs = FirestoreService();
+                final order = Order(
+                  id: 'temp',
+                  createdAt: DateTime.now(),
+                  items: [
+                    OrderItem(id: 'p1', name: 'Demo Perfume', price: 49.99, quantity: 1, imageUrl: 'assets/images/product_1.webp'),
+                    OrderItem(id: 'p2', name: 'Demo Scent', price: 29.99, quantity: 2, imageUrl: 'assets/images/product_2.webp'),
+                  ],
+                  total: 49.99 + 29.99 * 2,
+                  status: 'Paid',
+                );
+                await fs.addOrder(order);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dummy paid order added')));
+                }
+              },
+            ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              Provider.of<AuthService>(context, listen: false).signOut();
+            },
+          ),
+        ],
+      ),
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) => setState(() => _selectedIndex = index),
+        children: _screens,
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        selectedItemColor: Colors.deepPurple,
+        unselectedItemColor: Colors.grey,
+        showUnselectedLabels: true,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_bag), label: 'Products'),
+          BottomNavigationBarItem(icon: Icon(Icons.category), label: 'Categories'),
+          BottomNavigationBarItem(icon: Icon(Icons.image), label: 'Banners'),
+        ],
+      ),
+    );
+  }
+}
+
+class DashboardContent extends StatefulWidget {
+  const DashboardContent({super.key});
+
+  @override
+  State<DashboardContent> createState() => _DashboardContentState();
+}
+
+class _DashboardContentState extends State<DashboardContent> {
+  final _fs = FirestoreService();
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => context.read<OrdersService>().load());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<Order>>(
+      stream: _fs.getOrdersStream(),
+      builder: (context, snapshot) {
+        final orders = snapshot.data ?? <Order>[];
+        final int totalOrders = orders.length;
+        final int pendingOrders = orders.where((o) => o.status == 'Placed' || o.status == 'Pending').length;
+        final int completedOrders = orders.where((o) => o.status == 'Delivered' || o.status == 'Paid').length;
+        final double revenue = orders.fold(0.0, (s, o) => s + o.total);
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                _StatCard(title: 'Total Orders', value: '', icon: Icons.shopping_bag, color: Colors.indigo),
+                _StatCard(title: 'Revenue', value: '\{revenue.toStringAsFixed(2)}', icon: Icons.attach_money, color: Colors.green),
+                _StatCard(title: 'Pending', value: '', icon: Icons.schedule, color: Colors.orange),
+                _StatCard(title: 'Completed', value: '', icon: Icons.check_circle, color: Colors.teal),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(children: [Expanded(child: _OrdersTrend(orders: orders))]),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Catalog Snapshot', style: TextStyle(fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 8),
+                          StreamBuilder(
+                            stream: _fs.getProductsStream(),
+                            builder: (context, snapshot) {
+                              final count = snapshot.hasData ? (snapshot.data as List).length : null;
+                              return _CatalogRow(label: 'Products', value: count);
+                            },
+                          ),
+                          StreamBuilder(
+                            stream: _fs.getCategoriesStream(),
+                            builder: (context, snapshot) {
+                              final count = snapshot.hasData ? (snapshot.data as List).length : null;
+                              return _CatalogRow(label: 'Categories', value: count);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Recent Orders', style: TextStyle(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    if (orders.isEmpty) const Text('No orders yet'),
+                    ...orders.take(5).map((o) => ListTile(
+                          leading: CircleAvatar(child: Text(o.items.length.toString())),
+                          title: Text('# • \{o.total.toStringAsFixed(2)}'),
+                          subtitle: Text(o.createdAt.toLocal().toString()),
+                          trailing: Chip(label: Text(o.status)),
+                        )),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+  const _StatCard({required this.title, required this.value, required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 220,
+      height: 110,
+      child: Card(
+        color: color.withOpacity(0.08),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(title, style: TextStyle(color: color.withOpacity(0.9))),
+                    const SizedBox(height: 6),
+                    FittedBox(
+                      alignment: Alignment.centerLeft,
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        value,
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: color.darken()),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+extension _ColorX on Color {
+  Color darken([double amount = .2]) {
+    assert(amount >= 0 && amount <= 1);
+    final hsl = HSLColor.fromColor(this);
+    final hslDark = hsl.withLightness((hsl.lightness - amount).clamp(0.0, 1.0));
+    return hslDark.toColor();
+  }
+}
+
+class _CatalogRow extends StatelessWidget {
+  final String label;
+  final int? value;
+  const _CatalogRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label),
+          Text(value == null ? '—' : value.toString(), style: const TextStyle(fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrdersTrend extends StatelessWidget {
+  final List<Order> orders;
+  const _OrdersTrend({required this.orders});
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final last7 = List<DateTime>.generate(7, (i) => DateTime(now.year, now.month, now.day).subtract(Duration(days: 6 - i)));
+    final counts = last7
+        .map((d) => orders.where((o) => o.createdAt.year == d.year && o.createdAt.month == d.month && o.createdAt.day == d.day).length)
+        .toList();
+
+    final maxCount = (counts.isEmpty ? 1 : counts.reduce((a, b) => a > b ? a : b)).clamp(1, 999);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Orders - Last 7 days', style: TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 120,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (int i = 0; i < counts.length; i++) ...[
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeOutCubic,
+                            height: 8 + (counts[i] / maxCount) * 100,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(_dayLabel(last7[i]), style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                    if (i != counts.length - 1) const SizedBox(width: 6),
+                  ]
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _dayLabel(DateTime d) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return days[d.weekday - 1];
+  }
+}

@@ -1,0 +1,67 @@
+/*
+IMPORTANT: HOW TO SET AN ADMIN USER
+
+These security rules require a user to have a `role` field set to 'admin' 
+in their user document to get admin privileges (like adding/editing products).
+
+If you are getting "permission denied" errors in the admin panel, you need
+to manually set your user role to 'admin' in the Firebase console.
+
+Follow these steps:
+1. Go to your Firebase project: https://console.firebase.google.com/
+2. In the left menu, go to Build > Authentication.
+3. Find the admin user's account (e.g., nabeel@gmail.com) and copy its "User UID".
+4. In the left menu, go to Build > Firestore Database.
+5. Make sure you have a 'users' collection. If not, create one.
+6. Inside the 'users' collection, click "Add document".
+7. For the "Document ID", paste the User UID you copied in step 3.
+8. Add a field to the document:
+   - Field name: role
+   - Field type: string
+   - Field value: admin
+9. Add another field for email to easily identify the user:
+   - Field name: email
+   - Field type: string
+   - Field value: nabeel@gmail.com (or your admin email)
+10. Click "Save".
+
+The user is now an admin and should have full access to the admin panel.
+*/
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default Deny: By default, no one has access.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Users:
+    // - Authenticated users can read/write their own user document.
+    // - Admins can read any user document (for administrative purposes).
+    match /users/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Categories, Products, Banners:
+    // - Anyone (even unauthenticated users) can read.
+    // - Only admins can write (create, update, delete).
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "703643829941",
+    "project_id": "scentview-95df0",
+    "storage_bucket": "scentview-95df0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:703643829941:android:fcb0ed31d6a5c5a13460fc",
+        "android_client_info": {
+          "package_name": "com.example.scentview"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "703643829941-cichbb1es90ffv5i70g0jssrrsg0qnha.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBbL3OO9Rn5OWJzUjzGNWod1RrGmsOoNdQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "703643829941-cichbb1es90ffv5i70g0jssrrsg0qnha.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
