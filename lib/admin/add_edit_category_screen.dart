@@ -43,7 +43,6 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
       _isLoading = true;
     });
 
-    // This is a placeholder. In a real app, you would get this from your auth provider.
     const String authToken = "YOUR_AUTH_TOKEN_HERE";
 
     try {

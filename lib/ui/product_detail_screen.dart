@@ -16,7 +16,10 @@ class ProductDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final relatedProducts = allProducts.where((p) => p.id != product.id).toList();
+    // --- RELATED PRODUCTS FILTERING LOGIC ---
+    final relatedProducts = allProducts.where((p) {
+      return p.categoryId == product.categoryId && p.id != product.id;
+    }).toList();
 
     return Scaffold(
       appBar: AppBar(title: Text(product.name)),
@@ -27,20 +30,24 @@ class ProductDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Product Image
-            product.imageUrl.isEmpty
-                ? Container(
-                    height: 300,
-                    width: double.infinity,
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.image, size: 100, color: Colors.grey),
-                  )
-                : Image.network(
-                    product.imageUrl,
-                    height: 300,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-            const SizedBox(height: 16),
+            SizedBox(
+              height: 300,
+              width: double.infinity,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: product.imageUrl.isEmpty
+                    ? Container(
+                        color: Colors.grey[200],
+                        child: const Icon(Icons.image, size: 100, color: Colors.grey),
+                      )
+                    : Image.network(
+                        product.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (c, e, s) => const Icon(Icons.error, color: Colors.red),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 24),
 
             // Product Name
             Text(
@@ -58,48 +65,52 @@ class ProductDetailScreen extends StatelessWidget {
             // Description
             Text(
               product.description,
-              style: Theme.of(context).textTheme.bodyLarge,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
-            // Related Products
-            const Text(
-              "You might also like",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+            // --- RELATED PRODUCTS SECTION ---
+            if (relatedProducts.isNotEmpty) ...[
+              const Text(
+                "You might also like",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.7,
-              ),
-              itemCount: relatedProducts.length,
-              itemBuilder: (context, index) {
-                final relatedProduct = relatedProducts[index];
-                return ProductCard(
-                  product: relatedProduct,
-                  isCompact: false,
-                  onTap: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProductDetailScreen(
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 300, // Fixed height for horizontal list
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: relatedProducts.length,
+                  itemBuilder: (context, index) {
+                    final relatedProduct = relatedProducts[index];
+                    return SizedBox(
+                      width: 200, // Fixed width for each card
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 16.0),
+                        child: ProductCard(
                           product: relatedProduct,
-                          allProducts: allProducts,
+                          isCompact: false, // Or true, depending on desired look
+                          onTap: () {
+                            Navigator.push( // Use push instead of pushReplacement
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ProductDetailScreen(
+                                  product: relatedProduct,
+                                  allProducts: allProducts,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     );
                   },
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -110,7 +121,18 @@ class ProductDetailScreen extends StatelessWidget {
     bool onSale = product.salePrice != null && product.salePrice! > 0;
     return onSale
         ? Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
+              Text(
+                '\$${product.salePrice!.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 28,
+                  color: Colors.red,
+                ),
+              ),
+              const SizedBox(width: 12),
               Text(
                 '\$${product.originalPrice.toStringAsFixed(2)}',
                 style: const TextStyle(
@@ -119,22 +141,13 @@ class ProductDetailScreen extends StatelessWidget {
                   fontSize: 18,
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                '\$${product.salePrice!.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
-                  color: Colors.red,
-                ),
-              ),
             ],
           )
         : Text(
             '\$${product.originalPrice.toStringAsFixed(2)}',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 24,
+              fontSize: 28,
             ),
           );
   }

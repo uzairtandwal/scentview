@@ -1,41 +1,36 @@
-
 import 'package:flutter/material.dart';
 
-class AdminLayout extends StatefulWidget {
+class AdminLayout extends StatelessWidget {
   final Widget child;
 
   const AdminLayout({required this.child, Key? key}) : super(key: key);
 
   @override
-  _AdminLayoutState createState() => _AdminLayoutState();
-}
-
-class _AdminLayoutState extends State<AdminLayout> {
-  int _selectedIndex = 0;
-
-  @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.of(context).size.width >= 768;
-
-    return Scaffold(
-      appBar: isDesktop
-          ? null
-          : AppBar(
-              title: const Text("Admin Panel"),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth > 600) {
+          // Desktop layout
+          return Scaffold(
+            body: Row(
+              children: [
+                _buildSidebar(context),
+                Expanded(child: child),
+              ],
             ),
-      drawer: isDesktop ? null : _buildSidebar(),
-      body: Row(
-        children: [
-          if (isDesktop) _buildSidebar(),
-          Expanded(
-            child: widget.child,
-          ),
-        ],
-      ),
+          );
+        } else {
+          // Mobile layout
+          return Scaffold(
+            drawer: _buildSidebar(context),
+            body: child,
+          );
+        }
+      },
     );
   }
 
-  Widget _buildSidebar() {
+  Widget _buildSidebar(BuildContext context) {
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -52,26 +47,25 @@ class _AdminLayoutState extends State<AdminLayout> {
               ),
             ),
           ),
-          _buildSidebarItem(Icons.dashboard, "Dashboard", 0),
-          _buildSidebarItem(Icons.shopping_bag, "Products", 1),
-          _buildSidebarItem(Icons.receipt, "Orders", 2),
-          _buildSidebarItem(Icons.people, "Users", 3),
-          _buildSidebarItem(Icons.settings, "Settings", 4),
+          _buildSidebarItem(context, Icons.dashboard, "Dashboard", '/admin/dashboard'),
+          _buildSidebarItem(context, Icons.view_carousel, "Manage Banners", '/admin/banners'),
+          _buildSidebarItem(context, Icons.category, "Manage Categories", '/admin/categories'),
+          _buildSidebarItem(context, Icons.shopping_bag, "Manage Products", '/admin/products'),
         ],
       ),
     );
   }
 
-  Widget _buildSidebarItem(IconData icon, String title, int index) {
+  Widget _buildSidebarItem(BuildContext context, IconData icon, String title, String routeName) {
+    final currentRoute = ModalRoute.of(context)?.settings.name;
+    final isSelected = currentRoute == routeName;
+
     return ListTile(
       leading: Icon(icon),
       title: Text(title),
-      selected: _selectedIndex == index,
+      selected: isSelected,
       onTap: () {
-        setState(() {
-          _selectedIndex = index;
-        });
-        // Handle navigation
+        Navigator.pushReplacementNamed(context, routeName);
       },
     );
   }

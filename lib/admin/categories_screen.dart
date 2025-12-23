@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:scentview/admin/admin_layout.dart';
 import '../models/category.dart';
 import '../services/api_service.dart';
 import 'add_edit_category_screen.dart';
@@ -28,89 +29,100 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const AddEditCategoryScreen(),
+    return AdminLayout(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Manage Categories'),
+          leading: Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
             ),
-          );
-          _refresh();
-        },
-        child: const Icon(Icons.add),
-      ),
-      body: FutureBuilder<List<Category>>(
-        future: _categoriesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Text(
-                'No categories found. Tap the "+" button to add one.',
-                textAlign: TextAlign.center,
+          ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const AddEditCategoryScreen(),
               ),
             );
-          }
-          final categories = snapshot.data!;
-          return RefreshIndicator(
-            onRefresh: () async => _refresh(),
-            child: ListView.builder(
-              itemCount: categories.length,
-              itemBuilder: (context, index) {
-                final category = categories[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundImage:
-                          (category.imageUrl != null &&
-                              category.imageUrl!.isNotEmpty)
-                          ? NetworkImage(ApiService.toAbsoluteUrl(category.imageUrl)!)
-                          : null,
-                      child:
-                          (category.imageUrl == null ||
-                              category.imageUrl!.isEmpty)
-                          ? const Icon(Icons.category)
-                          : null,
+            _refresh();
+          },
+          child: const Icon(Icons.add),
+        ),
+        body: FutureBuilder<List<Category>>(
+          future: _categoriesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            }
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(
+                child: Text(
+                  'No categories found. Tap the "+" button to add one.',
+                  textAlign: TextAlign.center,
+                ),
+              );
+            }
+            final categories = snapshot.data!;
+            return RefreshIndicator(
+              onRefresh: () async => _refresh(),
+              child: ListView.builder(
+                itemCount: categories.length,
+                itemBuilder: (context, index) {
+                  final category = categories[index];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
                     ),
-                    title: Text(category.name),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.blue),
-                          onPressed: () async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    AddEditCategoryScreen(category: category),
-                              ),
-                            );
-                            _refresh();
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () =>
-                              _showDeleteConfirmationDialog(context, category),
-                        ),
-                      ],
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundImage:
+                            (category.imageUrl != null &&
+                                category.imageUrl!.isNotEmpty)
+                            ? NetworkImage(ApiService.toAbsoluteUrl(category.imageUrl)!)
+                            : null,
+                        child:
+                            (category.imageUrl == null ||
+                                category.imageUrl!.isEmpty)
+                            ? const Icon(Icons.category)
+                            : null,
+                      ),
+                      title: Text(category.name),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      AddEditCategoryScreen(category: category),
+                                ),
+                              );
+                              _refresh();
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () =>
+                                _showDeleteConfirmationDialog(context, category),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-          );
-        },
+                  );
+                },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -136,9 +148,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('Delete'),
               onPressed: () async {
-                // This is a placeholder. In a real app, you would get this from your auth provider.
                 const String authToken = "YOUR_AUTH_TOKEN_HERE";
-                await _api.deleteCategory(category.id.toString(), token: authToken);
+                await _api.deleteCategory(id: category.id.toString(), token: authToken);
                 if (mounted) Navigator.of(context).pop();
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../models/banner.dart' as model; // Alias the custom Banner model
+import 'package:scentview/models/banner.dart' as app_banner; // Alias added
 import '../services/api_service.dart';
 import 'package:image_picker/image_picker.dart';
 
 class AddEditBannerScreen extends StatefulWidget {
-  final model.Banner? banner; // Use aliased Banner
+  final app_banner.Banner? banner; // Use alias
 
   const AddEditBannerScreen({super.key, this.banner});
 
@@ -25,7 +25,6 @@ class _AddEditBannerScreenState extends State<AddEditBannerScreen> {
   @override
   void initState() {
     super.initState();
-    // Access widget properties using widget.
     _titleController = TextEditingController(text: widget.banner?.title ?? '');
     _targetScreenController = TextEditingController(
       text: widget.banner?.targetScreen ?? '',
@@ -54,7 +53,6 @@ class _AddEditBannerScreenState extends State<AddEditBannerScreen> {
       _isLoading = true;
     });
 
-    // This is a placeholder. In a real app, you would get this from your auth provider.
     const String authToken = "YOUR_AUTH_TOKEN_HERE";
 
     try {
@@ -62,7 +60,7 @@ class _AddEditBannerScreenState extends State<AddEditBannerScreen> {
 
       if (isUpdating) {
         await _api.updateBanner(
-          id: widget.banner!.id,
+          id: widget.banner!.id.toString(),
           title: _titleController.text,
           targetScreen: _targetScreenController.text.isEmpty
               ? null
@@ -74,7 +72,6 @@ class _AddEditBannerScreenState extends State<AddEditBannerScreen> {
           token: authToken,
         );
       } else {
-        // For create, ensure an image is provided
         if (_pickedImage == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -178,7 +175,7 @@ class _AddEditBannerScreenState extends State<AddEditBannerScreen> {
                         const SizedBox(width: 12),
                         if (_pickedImage != null)
                           Expanded(child: Text(_pickedImage!.name, overflow: TextOverflow.ellipsis,))
-                        else if(_imageUrl != null && _imageUrl!.isNotEmpty)
+                        else if(_imageUrl?.isNotEmpty ?? false)
                           const Text('Image selected'),
 
                       ],

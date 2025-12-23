@@ -1,270 +1,182 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../services/auth_service.dart';
-import '../services/api_service.dart';
-import 'products_screen.dart';
-import 'categories_screen.dart';
-import 'banners_screen.dart';
+import 'package:scentview/admin/admin_layout.dart';
+import 'package:scentview/services/api_service.dart';
+import 'package:scentview/models/product_model.dart';
+import 'package:scentview/models/category.dart' as app_category;
 
 class AdminHomeScreen extends StatefulWidget {
-  static const routeName = '/admin-home';
-  const AdminHomeScreen({super.key});
+  static const String routeName = '/admin/dashboard';
+  const AdminHomeScreen({Key? key}) : super(key: key);
 
   @override
   State<AdminHomeScreen> createState() => _AdminHomeScreenState();
 }
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
-  int _selectedIndex = 0;
-  final PageController _pageController = PageController();
-
-  final List<Widget> _screens = const [
-    DashboardContent(),
-    ProductsScreen(),
-    CategoriesScreen(),
-    BannersScreen(),
-  ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-      _pageController.animateToPage(
-        index,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.ease,
-      );
-    });
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const List<String> screenTitles = [
-      'Admin Dashboard',
-      'Product Management',
-      'Category Management',
-      'Banner Management',
-    ];
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(screenTitles[_selectedIndex]),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () =>
-                Provider.of<AuthService>(context, listen: false).signOut(),
-          ),
-        ],
-      ),
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) => setState(() => _selectedIndex = index),
-        children: _screens,
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: Colors.deepPurple,
-        unselectedItemColor: Colors.grey,
-        showUnselectedLabels: true,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_bag),
-            label: 'Products',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.category),
-            label: 'Categories',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.image), label: 'Banners'),
-        ],
-      ),
-    );
-  }
-}
-
-class DashboardContent extends StatefulWidget {
-  const DashboardContent({super.key});
-  @override
-  State<DashboardContent> createState() => _DashboardContentState();
-}
-
-class _DashboardContentState extends State<DashboardContent> {
-  final _api = ApiService();
-  int? _products;
-  int? _categories;
-  int? _banners;
-  bool _loading = true;
+  final ApiService _apiService = ApiService();
+  late Future<List<Product>> _productsFuture;
+  late Future<List<app_category.Category>> _categoriesFuture;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadData();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
-    try {
-      final results = await Future.wait<dynamic>([
-        _api.fetchProducts(),
-        _api.fetchCategories(),
-        _api.fetchBanners(),
-      ]);
-      setState(() {
-        _products = (results[0] as List).length;
-        _categories = (results[1] as List).length;
-        _banners = (results[2] as List).length;
-      });
-    } catch (_) {}
-    if (mounted) setState(() => _loading = false);
+  void _loadData() {
+    setState(() {
+      _productsFuture = _apiService.fetchProducts();
+      _categoriesFuture = _apiService.fetchCategories();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: () async => _load(),
-      child: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          Row(
-            children: const [
-              Expanded(
-                child: _StatCard(
-                  title: 'Welcome Admin',
-                  value: 'Manage your store',
-                  icon: Icons.dashboard_customize,
-                  color: Colors.deepPurple,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Catalog Overview',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 12),
-                  _CatalogRow(label: 'Products', value: _products),
-                  _CatalogRow(label: 'Categories', value: _categories),
-                  _CatalogRow(label: 'Banners', value: _banners),
-                  if (_loading)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: LinearProgressIndicator(minHeight: 3),
-                    ),
-                ],
-              ),
+    return AdminLayout(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Admin Dashboard'),
+          leading: Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: color.withOpacity(0.08),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(title, style: TextStyle(color: color.withOpacity(0.9))),
-                  const SizedBox(height: 6),
-                  FittedBox(
-                    alignment: Alignment.centerLeft,
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      value,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 22,
-                        color: color.darken(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadData,
             ),
           ],
+        ),
+        body: RefreshIndicator(
+          onRefresh: () async => _loadData(),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Overview',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 16),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxWidth < 600) { // Adjust breakpoint as needed
+                      return Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+                            child: FutureBuilder<List<Product>>(
+                              future: _productsFuture,
+                              builder: (context, snapshot) {
+                                return _buildStatCard(
+                                  title: 'Total Products',
+                                  value: snapshot.hasData ? snapshot.data!.length.toString() : '...',
+                                  icon: Icons.shopping_bag,
+                                  color: Colors.blue,
+                                );
+                              },
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+                            child: FutureBuilder<List<app_category.Category>>(
+                              future: _categoriesFuture,
+                              builder: (context, snapshot) {
+                                return _buildStatCard(
+                                  title: 'Total Categories',
+                                  value: snapshot.hasData ? snapshot.data!.length.toString() : '...',
+                                  icon: Icons.category,
+                                  color: Colors.green,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    } else {
+                      return Row(
+                        children: [
+                          Flexible(
+                            fit: FlexFit.tight,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                              child: FutureBuilder<List<Product>>(
+                                future: _productsFuture,
+                                builder: (context, snapshot) {
+                                  return _buildStatCard(
+                                    title: 'Total Products',
+                                    value: snapshot.hasData ? snapshot.data!.length.toString() : '...',
+                                    icon: Icons.shopping_bag,
+                                    color: Colors.blue,
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          Flexible(
+                            fit: FlexFit.tight,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                              child: FutureBuilder<List<app_category.Category>>(
+                                future: _categoriesFuture,
+                                builder: (context, snapshot) {
+                                  return _buildStatCard(
+                                    title: 'Total Categories',
+                                    value: snapshot.hasData ? snapshot.data!.length.toString() : '...',
+                                    icon: Icons.category,
+                                    color: Colors.green,
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                  },
+                ),
+                // Add more dashboard widgets here
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
-}
 
-extension _ColorX on Color {
-  Color darken([double amount = .2]) {
-    assert(amount >= 0 && amount <= 1);
-    final hsl = HSLColor.fromColor(this);
-    final hslDark = hsl.withLightness((hsl.lightness - amount).clamp(0.0, 1.0));
-    return hslDark.toColor();
-  }
-}
-
-class _CatalogRow extends StatelessWidget {
-  final String label;
-  final int? value;
-  const _CatalogRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label),
-          Text(
-            value == null ? '-' : value.toString(),
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ],
+  Widget _buildStatCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 16),
+                ),
+                Icon(icon, color: color),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
       ),
     );
   }

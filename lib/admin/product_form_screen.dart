@@ -96,7 +96,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           salePrice: _salePriceController.text,
           categoryId: _selectedCategoryId!,
           isFeatured: _isFeatured,
-          badgeText: _badgeController.text, // ✅ Added Badge Text Here
+          badgeText: _badgeController.text,
           imageFile: _pickedImage, 
           token: token,
         );
@@ -110,11 +110,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           salePrice: _salePriceController.text,
           categoryId: _selectedCategoryId!,
           isFeatured: _isFeatured,
-          badgeText: _badgeController.text, // ✅ Added Badge Text Here
+          badgeText: _badgeController.text,
           imageFile: _pickedImage,
+          existingImageUrl: _pickedImage == null ? widget.product!.imageUrl : null, // Pass existing image URL if no new image is picked
           token: token,
-        );
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Product Updated!')));
+        );        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Product Updated!')));
       }
 
       if (widget.onSave != null) widget.onSave!();
@@ -169,10 +169,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 Expanded(child: _buildField(_salePriceController, "Sale Price", type: TextInputType.number)),
               ]),
               const SizedBox(height: 10),
-              
-              // ✅ Badge Text Field
-              _buildField(_badgeController, "Badge Text (e.g. Sale, New, Hot)"),
-              
+              _buildField(_badgeController, "Badge Text (e.g. Sale, New)"),
               const SizedBox(height: 10),
 
               FutureBuilder<List<app_category.Category>>(
@@ -196,7 +193,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   return DropdownButtonFormField<String>(
                     value: _selectedCategoryId,
                     decoration: const InputDecoration(labelText: "Category", border: OutlineInputBorder()),
-                    items: snapshot.data!.map((c) => DropdownMenuItem(value: c.id.toString(), child: Text(c.name))).toList(),
+                    items: snapshot.data!.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
                     onChanged: (v) => setState(() => _selectedCategoryId = v),
                     validator: (v) => v == null ? "Select a category" : null,
                   );
@@ -227,7 +224,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
       maxLines: maxLines,
       keyboardType: type,
-      validator: (v) => v!.isEmpty && label != "Sale Price" && label != "Badge Text (e.g. Sale, New, Hot)" ? "Required" : null,
+      validator: (v) => v!.isEmpty && label != "Sale Price" && label != "Badge Text (e.g. Sale, New)" ? "Required" : null,
     );
   }
 }

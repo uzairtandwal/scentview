@@ -9,10 +9,13 @@ class Product {
   final String imageUrl;
   final bool isFeatured;
   final bool isSlider;
-  final String? badgeText; // TAG (Sale, New, etc.)
+  final String? badgeText;
   final dynamic categoryId;
   final dynamic category;
-  final Map<String, dynamic>? fragranceNotes; // ✅ Added this
+  final Map<String, dynamic>? fragranceNotes;
+  final String size;
+  final String scentFamily;
+  final int stock;
 
   Product({
     required this.id,
@@ -27,6 +30,9 @@ class Product {
     required this.categoryId,
     this.category,
     this.fragranceNotes,
+    required this.size,
+    required this.scentFamily,
+    required this.stock,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -39,18 +45,16 @@ class Product {
       imageUrl: ApiService.toAbsoluteUrl(json['main_image_url']?.toString()) ?? '',
       isFeatured: json['is_featured'] == 1 || json['is_featured'] == true,
       isSlider: json['is_slider'] == 1 || json['is_slider'] == true,
-      // IMPORTANT: Mapping Badge Text correctly
-      badgeText: json['badge_text'], 
+      badgeText: json['badge_text'],
       categoryId: json['category_id'],
       category: json['category'],
-      // ✅ Handle fragrance notes safely
-      fragranceNotes: json['fragrance_notes'] is Map<String, dynamic> 
-          ? json['fragrance_notes'] 
-          : null,
+      fragranceNotes: json['fragrance_notes'] is Map ? Map<String, dynamic>.from(json['fragrance_notes']) : null,
+      size: json['size'] ?? '',
+      scentFamily: json['scent_family'] ?? '',
+      stock: json['stock'] ?? 0,
     );
   }
 
-  // ✅ Added toJson (Required for API/Storage)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -63,12 +67,13 @@ class Product {
       'is_slider': isSlider,
       'badge_text': badgeText,
       'category_id': categoryId,
-      'category': category,
       'fragrance_notes': fragranceNotes,
-    };
+      'size': size,
+      'scent_family': scentFamily,
+      'stock': stock,
+    }..removeWhere((key, value) => value == null);
   }
 
-  // ✅ Added copyWith (Required for UI Updates)
   Product copyWith({
     dynamic id,
     String? name,
@@ -82,6 +87,9 @@ class Product {
     dynamic categoryId,
     dynamic category,
     Map<String, dynamic>? fragranceNotes,
+    String? size,
+    String? scentFamily,
+    int? stock,
   }) {
     return Product(
       id: id ?? this.id,
@@ -96,6 +104,9 @@ class Product {
       categoryId: categoryId ?? this.categoryId,
       category: category ?? this.category,
       fragranceNotes: fragranceNotes ?? this.fragranceNotes,
+      size: size ?? this.size,
+      scentFamily: scentFamily ?? this.scentFamily,
+      stock: stock ?? this.stock,
     );
   }
 }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:scentview/admin/admin_home_screen.dart';
+import 'package:scentview/admin/banners_screen.dart';
+import 'package:scentview/admin/categories_screen.dart';
+import 'package:scentview/admin/products_screen.dart';
 import 'package:scentview/models/product_model.dart';
 import 'package:scentview/services/auth_service.dart';
 import 'package:scentview/services/cart_service.dart';
@@ -33,6 +36,10 @@ class ScentViewApp extends StatelessWidget {
           MainAppScreen.routeName: (context) => const MainAppScreen(),
           AdminHomeScreen.routeName: (context) => const AdminHomeScreen(),
           CartScreen.routeName: (context) => const CartScreen(),
+          '/admin/dashboard': (context) => const AdminHomeScreen(),
+          '/admin/banners': (context) => const BannersScreen(),
+          '/admin/categories': (context) => const CategoriesScreen(),
+          '/admin/products': (context) => const ProductsScreen(),
         },
         onGenerateRoute: (settings) {
           if (settings.name == ProductDetailScreen.routeName) {

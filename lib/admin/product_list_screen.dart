@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:scentview/admin/admin_layout.dart';
-import 'package:scentview/admin/product_form_screen.dart'; // ✅ Sahi file import karein
+import 'package:scentview/admin/product_form_screen.dart';
 import 'package:scentview/models/product_model.dart';
 import 'package:scentview/services/api_service.dart';
 
@@ -20,7 +20,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   @override
   void initState() {
     super.initState();
-    _refreshProducts(); // Shuru mein data load karo
+    _refreshProducts();
   }
 
   void _refreshProducts() {
@@ -29,7 +29,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
     });
   }
 
-  // DELETE FUNCTION
   Future<void> _deleteProduct(String id) async {
     bool confirm = await showDialog(
       context: context,
@@ -44,27 +43,25 @@ class _ProductListScreenState extends State<ProductListScreen> {
     ) ?? false;
 
     if (confirm) {
-      // This is a placeholder. In a real app, you would get this from your auth provider.
       const String authToken = "YOUR_AUTH_TOKEN_HERE";
       try {
-        await _apiService.deleteProduct(id, token: authToken); // API call
+        await _apiService.deleteProduct(id, token: authToken);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Product deleted successfully')));
-        _refreshProducts(); // List refresh karo
+        _refreshProducts();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
 
-  // Helper for Badge Color
   Color _getBadgeColor(String? text) {
-    if (text == null || text.isEmpty) return Colors.blue; // Default or no badge
+    if (text == null || text.isEmpty) return Colors.blue;
     String label = text.toLowerCase();
     if (label.contains('new')) return Colors.green;
     if (label.contains('sale') || label.contains('%')) return Colors.red;
     if (label.contains('sold')) return Colors.grey;
     if (label.contains('coming soon')) return Colors.orange;
-    return Colors.blue; // Fallback for other texts
+    return Colors.blue;
   }
 
   @override
@@ -77,12 +74,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
             IconButton(
               icon: const Icon(Icons.add),
               onPressed: () {
-                // ✅ ADD: ProductFormScreen par jao aur wapis aane par refresh karo
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => ProductFormScreen(
-                      onSave: _refreshProducts, // Refresh callback pass kiya
+                      onSave: _refreshProducts,
                     ),
                   ),
                 );
@@ -104,9 +100,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
             final products = snapshot.data!;
 
             return SingleChildScrollView(
-              scrollDirection: Axis.vertical, // Vertical scroll
+              scrollDirection: Axis.vertical,
               child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal, // Horizontal scroll table ke liye
+                scrollDirection: Axis.horizontal,
                 child: DataTable(
                   columns: const [
                     DataColumn(label: Text('Image')),
@@ -117,16 +113,13 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   ],
                   rows: products.map((product) {
                     return DataRow(cells: [
-                      // Image
                       DataCell(
                         product.imageUrl.isNotEmpty
                             ? Image.network(ApiService.toAbsoluteUrl(product.imageUrl)!, width: 40, height: 40, fit: BoxFit.cover,
                                 errorBuilder: (c, o, s) => const Icon(Icons.image_not_supported))
                             : const Icon(Icons.image, color: Colors.grey),
                       ),
-                      // Name
                       DataCell(Text(product.name)),
-                      // Price
                       DataCell(
                         product.salePrice != null && product.salePrice! > 0
                             ? Column(
@@ -139,7 +132,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
                               )
                             : Text('PKR ${product.originalPrice.toStringAsFixed(0)}'),
                       ),
-                      // Badge
                       DataCell(
                         product.badgeText != null && product.badgeText!.isNotEmpty
                             ? Chip(
@@ -150,19 +142,17 @@ class _ProductListScreenState extends State<ProductListScreen> {
                               )
                             : const Text('-'),
                       ),
-                      // Actions (Edit & Delete)
                       DataCell(
                         Row(
                           children: [
                             IconButton(
                               icon: const Icon(Icons.edit, color: Colors.blue),
                               onPressed: () {
-                                // ✅ EDIT: Product pass karo aur refresh handle karo
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => ProductFormScreen(
-                                      product: product, // Data pass kiya
+                                      product: product,
                                       onSave: _refreshProducts,
                                     ),
                                   ),
