@@ -12,9 +12,9 @@ import 'package:scentview/ui/cart_screen.dart';
 import 'package:scentview/ui/main_app_screen.dart';
 import 'package:scentview/ui/mode_selection_screen.dart';
 import 'package:scentview/ui/product_detail_screen.dart';
-
+import 'package:scentview/ui/checkout_screen.dart';
 class ScentViewApp extends StatelessWidget {
-  const ScentViewApp({Key? key}) : super(key: key);
+  const ScentViewApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +36,7 @@ class ScentViewApp extends StatelessWidget {
           MainAppScreen.routeName: (context) => const MainAppScreen(),
           AdminHomeScreen.routeName: (context) => const AdminHomeScreen(),
           CartScreen.routeName: (context) => const CartScreen(),
-          '/admin/dashboard': (context) => const AdminHomeScreen(),
+          CheckoutScreen.routeName: (context) => const CheckoutScreen(),
           '/admin/banners': (context) => const BannersScreen(),
           '/admin/categories': (context) => const CategoriesScreen(),
           '/admin/products': (context) => const ProductsScreen(),

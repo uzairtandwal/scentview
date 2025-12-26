@@ -9,7 +9,20 @@ class AuthUser {
   final String name;
   final String email;
   final String role;
-  const AuthUser({required this.name, required this.email, required this.role});
+  final String? photoUrl;
+  final DateTime? createdAt;
+  final String? phoneNumber;
+  final String? address;
+
+  const AuthUser({
+    required this.name,
+    required this.email,
+    required this.role,
+    this.photoUrl,
+    this.createdAt,
+    this.phoneNumber,
+    this.address,
+  });
 }
 
 class AuthService {
@@ -22,6 +35,7 @@ class AuthService {
   }
 
   Stream<AuthUser?> get user => _controller.stream;
+  AuthUser? get currentUser => _current;
 
   Future<void> _bootstrap() async {
     final prefs = await SharedPreferences.getInstance();
@@ -39,6 +53,10 @@ class AuthService {
             name: data['name'] ?? '',
             email: data['email'] ?? '',
             role: data['role'] ?? 'user',
+            photoUrl: data['photo_url'],
+            createdAt: data['created_at'] != null ? DateTime.parse(data['created_at']) : null,
+            phoneNumber: data['phone_number'],
+            address: data['address'],
           );
           _controller.add(_current);
         }
@@ -73,6 +91,10 @@ class AuthService {
         name: user['name'] ?? '',
         email: user['email'] ?? '',
         role: user['role'] ?? 'user',
+        photoUrl: user['photo_url'],
+        createdAt: user['created_at'] != null ? DateTime.parse(user['created_at']) : null,
+        phoneNumber: user['phone_number'],
+        address: user['address'],
       );
       _controller.add(_current);
       return null;
@@ -110,6 +132,10 @@ class AuthService {
         name: user['name'] ?? '',
         email: user['email'] ?? '',
         role: user['role'] ?? 'user',
+        photoUrl: user['photo_url'],
+        createdAt: user['created_at'] != null ? DateTime.parse(user['created_at']) : null,
+        phoneNumber: user['phone_number'],
+        address: user['address'],
       );
       _controller.add(_current);
       return null;

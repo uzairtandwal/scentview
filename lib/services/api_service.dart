@@ -11,17 +11,20 @@ import 'package:flutter/foundation.dart';
 class ApiService {
   final String baseUrl;
   static String? authToken;
+  
+  // Base URL for images (Database path)
+  static const String imageBaseUrl = 'https://scentview.alwaysdata.net/storage/uploads/';
 
   ApiService({this.baseUrl = 'https://scentview.alwaysdata.net/api'});
 
   Uri _u(String path) => Uri.parse('$baseUrl$path');
 
+  // Helper for reading URLs
   static String? toAbsoluteUrl(String? relativeUrl) {
     if (relativeUrl == null || relativeUrl.isEmpty) return null;
-    if (relativeUrl.startsWith('http')) return relativeUrl.replaceFirst('http://', 'https://');
-    final baseUri = Uri.parse('https://scentview.alwaysdata.net');
-    final finalUri = baseUri.resolve(relativeUrl);
-    return finalUri.toString();
+    if (relativeUrl.startsWith('http')) return relativeUrl;
+    // Fallback if needed
+    return '$imageBaseUrl$relativeUrl'; 
   }
 
   Map<String, String> _headers({bool json = false, bool multipart = false, String? token}) {
@@ -38,6 +41,17 @@ class ApiService {
     return h;
   }
 
+  String _parseError(int statusCode, String responseBody) {
+    try {
+      final body = jsonDecode(responseBody);
+      if (body is Map && body.containsKey('message')) {
+        return body['message'];
+      }
+    } catch (_) {}
+    return 'Request failed with status: $statusCode';
+  }
+
+  // ================ CATEGORY METHODS ================
   Future<List<app_category.Category>> fetchCategories() async {
     final res = await http.get(_u('/categories'), headers: _headers());
     if (res.statusCode != 200) throw Exception('Failed to fetch categories');
@@ -55,8 +69,8 @@ class ApiService {
       request.files.add(http.MultipartFile.fromBytes('image', bytes, filename: imageFile.name, contentType: mimeType != null ? MediaType.parse(mimeType) : null));
     }
     final response = await request.send();
-    if (response.statusCode >= 300) throw Exception('Create category failed');
     final responseBody = await response.stream.bytesToString();
+    if (response.statusCode >= 300) throw Exception(_parseError(response.statusCode, responseBody));
     return jsonDecode(responseBody) as Map<String, dynamic>;
   }
 
@@ -71,8 +85,8 @@ class ApiService {
       request.files.add(http.MultipartFile.fromBytes('image', bytes, filename: imageFile.name, contentType: mimeType != null ? MediaType.parse(mimeType) : null));
     }
     final response = await request.send();
-    if (response.statusCode >= 300) throw Exception('Update category failed');
     final responseBody = await response.stream.bytesToString();
+    if (response.statusCode >= 300) throw Exception(_parseError(response.statusCode, responseBody));
     return jsonDecode(responseBody) as Map<String, dynamic>;
   }
 
@@ -81,55 +95,130 @@ class ApiService {
     if (res.statusCode >= 300) throw Exception('Delete category failed');
   }
 
+  // ================ BANNER METHODS (CLEAN VERSION) ================
   Future<List<model.Banner>> fetchBanners() async {
-    final res = await http.get(_u('/banners'), headers: _headers());
-    if (res.statusCode != 200) throw Exception('Banners ${res.statusCode}');
-    final List data = jsonDecode(res.body) as List;
-    return data.map((e) => model.Banner.fromJson(e)).toList();
+    try {
+      final res = await http.get(_u('/banners'), headers: _headers());
+      if (res.statusCode != 200) throw Exception('Failed to fetch banners: ${res.statusCode}');
+      final List data = jsonDecode(res.body) as List;
+      return data.map((e) => model.Banner.fromJson(e)).toList();
+    } catch (e) {
+      print('Error fetching banners: $e');
+      rethrow;
+    }
   }
 
-  Future<Map<String, dynamic>> createBanner({required String title, String? targetScreen, String? targetId, required XFile imageFile, int sortOrder = 0, bool isActive = true, String? token}) async {
-    var request = http.MultipartRequest('POST', _u('/banners'));
-    request.headers.addAll(_headers(multipart: true, token: token));
-    request.fields['title'] = title;
-    request.fields['target_screen'] = targetScreen ?? '';
-    request.fields['target_id'] = targetId ?? '';
-    request.fields['sort_order'] = sortOrder.toString();
-    request.fields['is_active'] = isActive ? '1' : '0';
-    final bytes = await imageFile.readAsBytes();
-    final mimeType = lookupMimeType(imageFile.path);
-    request.files.add(http.MultipartFile.fromBytes('main_image_url', bytes, filename: imageFile.name, contentType: mimeType != null ? MediaType.parse(mimeType) : null));
-    final response = await request.send();
-    if (response.statusCode >= 300) throw Exception('Create banner failed');
-    final responseBody = await response.stream.bytesToString();
-    return jsonDecode(responseBody) as Map<String, dynamic>;
-  }
-
-  Future<Map<String, dynamic>> updateBanner({required String id, required String title, String? targetScreen, String? targetId, XFile? imageFile, int? sortOrder, bool? isActive, String? token}) async {
-    var request = http.MultipartRequest('POST', _u('/banners/$id'));
-    request.fields['_method'] = 'PUT';
-    request.headers.addAll(_headers(multipart: true, token: token));
-    request.fields['title'] = title;
-    if (targetScreen != null) request.fields['target_screen'] = targetScreen;
-    if (targetId != null) request.fields['target_id'] = targetId;
-    if (sortOrder != null) request.fields['sort_order'] = sortOrder.toString();
-    if (isActive != null) request.fields['is_active'] = isActive ? '1' : '0';
-    if (imageFile != null) {
+  Future<Map<String, dynamic>> createBanner({
+    required String title,
+    String? targetScreen,
+    String? targetId,
+    required XFile imageFile,
+    int sortOrder = 0,
+    bool isActive = true,
+    String? description,
+    String? token,
+  }) async {
+    try {
+      var request = http.MultipartRequest('POST', _u('/banners'));
+      request.headers.addAll(_headers(multipart: true, token: token));
+      
+      request.fields['title'] = title;
+      if (targetScreen != null) request.fields['target_screen'] = targetScreen;
+      if (targetId != null) request.fields['target_id'] = targetId;
+      if (description != null) request.fields['description'] = description;
+      request.fields['sort_order'] = sortOrder.toString();
+      request.fields['is_active'] = isActive ? '1' : '0';
+      
+      // === CLEANUP ===
+      // Hum yahan se koi image_url string nahi bhej rahe.
+      // Sirf FILE bhej rahe hain 'image' key par.
+      // Server khud handle karega.
+      
       final bytes = await imageFile.readAsBytes();
       final mimeType = lookupMimeType(imageFile.path);
-      request.files.add(http.MultipartFile.fromBytes('main_image_url', bytes, filename: imageFile.name, contentType: mimeType != null ? MediaType.parse(mimeType) : null));
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'image', 
+          bytes,
+          filename: imageFile.name,
+          contentType: mimeType != null ? MediaType.parse(mimeType) : null,
+        ),
+      );
+      
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return jsonDecode(responseBody) as Map<String, dynamic>;
+      } else {
+        throw Exception(_parseError(response.statusCode, responseBody));
+      }
+    } catch (e) {
+      rethrow;
     }
-    final response = await request.send();
-    if (response.statusCode >= 300) throw Exception('Update banner failed');
-    final responseBody = await response.stream.bytesToString();
-    return jsonDecode(responseBody) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateBanner({
+    required String id,
+    required String title,
+    String? targetScreen,
+    String? targetId,
+    XFile? imageFile,
+    int? sortOrder,
+    bool? isActive,
+    String? description,
+    String? currentImageUrl,
+    String? token,
+  }) async {
+    try {
+      var request = http.MultipartRequest('POST', _u('/banners/$id'));
+      request.fields['_method'] = 'PUT';
+      request.headers.addAll(_headers(multipart: true, token: token));
+      
+      request.fields['title'] = title;
+      if (targetScreen != null) request.fields['target_screen'] = targetScreen;
+      if (targetId != null) request.fields['target_id'] = targetId;
+      if (description != null) request.fields['description'] = description;
+      if (sortOrder != null) request.fields['sort_order'] = sortOrder.toString();
+      if (isActive != null) request.fields['is_active'] = isActive ? '1' : '0';
+      
+      if (imageFile != null) {
+        // === CLEANUP ===
+        // Update mein bhi sirf file bhej rahe hain.
+        final bytes = await imageFile.readAsBytes();
+        final mimeType = lookupMimeType(imageFile.path);
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'image', 
+            bytes,
+            filename: imageFile.name,
+            contentType: mimeType != null ? MediaType.parse(mimeType) : null,
+          ),
+        );
+      } 
+      // Agar image null hai to kuch nahi bhej rahe, server purana link rakhega.
+      
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return jsonDecode(responseBody) as Map<String, dynamic>;
+      } else {
+        throw Exception(_parseError(response.statusCode, responseBody));
+      }
+    } catch (e) {
+      rethrow;
+    }
   }
 
   Future<void> deleteBanner({required String id, String? token}) async {
-    final res = await http.delete(_u('/banners/$id'), headers: _headers(token: token));
-    if (res.statusCode >= 300) throw Exception('Delete banner failed');
+    final response = await http.delete(_u('/banners/$id'), headers: _headers(token: token));
+    if (response.statusCode != 204 && response.statusCode != 200) {
+      throw Exception('Failed to delete banner: ${response.statusCode}');
+    }
   }
 
+  // ================ PRODUCT METHODS ================
   Future<List<Product>> fetchProducts({String? query}) async {
     var path = '/products';
     if (query != null && query.isNotEmpty) path += '?q=$query';
@@ -139,7 +228,7 @@ class ApiService {
     return data.map((e) => Product.fromJson(e)).toList();
   }
 
-    Future<List<Product>> fetchSliderProducts() async {
+  Future<List<Product>> fetchSliderProducts() async {
     final res = await http.get(_u('/slider-products'), headers: _headers());
     if (res.statusCode != 200) throw Exception('Slider products ${res.statusCode}');
     final List data = jsonDecode(res.body) as List;
@@ -147,16 +236,23 @@ class ApiService {
   }
 
   Future<List<Product>> fetchFeaturedProducts() async {
-    final res = await http.get(
-      _u('/products/featured'),
-      headers: _headers(),
-    );
+    final res = await http.get(_u('/products/featured'), headers: _headers());
     if (res.statusCode != 200) throw Exception('Featured products ${res.statusCode}');
     final List data = jsonDecode(res.body) as List;
     return data.map((e) => Product.fromJson(e)).toList();
   }
 
-  Future<Product> addProduct({required String name, required String description, required String price, String? salePrice, required String categoryId, required bool isFeatured, String? badgeText, XFile? imageFile, String? token,}) async {
+  Future<Product> addProduct({
+    required String name,
+    required String description,
+    required String price,
+    String? salePrice,
+    required String categoryId,
+    required bool isFeatured,
+    String? badgeText,
+    XFile? imageFile,
+    String? token,
+  }) async {
     final request = http.MultipartRequest('POST', _u('/products'));
     request.headers.addAll(_headers(token: token, multipart: true));
     
@@ -168,17 +264,13 @@ class ApiService {
       'is_featured': isFeatured ? '1' : '0',
     });
 
-    if (badgeText != null && badgeText.isNotEmpty) {
-      request.fields['badge_text'] = badgeText.trim();
-    }
-    if (salePrice != null && salePrice.trim().isNotEmpty) {
-      request.fields['sale_price'] = salePrice.trim();
-    }
+    if (badgeText != null) request.fields['badge_text'] = badgeText.trim();
+    if (salePrice != null) request.fields['sale_price'] = salePrice.trim();
 
     if (imageFile != null) {
       final bytes = await imageFile.readAsBytes();
       final mimeType = lookupMimeType(imageFile.path);
-      request.files.add(http.MultipartFile.fromBytes('main_image_url', bytes, filename: imageFile.name, contentType: mimeType != null ? MediaType.parse(mimeType) : null));
+      request.files.add(http.MultipartFile.fromBytes('image_url', bytes, filename: imageFile.name, contentType: mimeType != null ? MediaType.parse(mimeType) : null));
     }
 
     final streamedResponse = await request.send();
@@ -187,11 +279,23 @@ class ApiService {
     if (response.statusCode == 201 || response.statusCode == 200) {
       return Product.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception('Failed to add product: ${response.statusCode} ${response.body}');
+      throw Exception(_parseError(response.statusCode, response.body));
     }
   }
 
-  Future<Product> updateProduct({required String id, required String name, required String description, required String price, String? salePrice, required String categoryId, required bool isFeatured, String? badgeText, XFile? imageFile, String? existingImageUrl, String? token,}) async {
+  Future<Product> updateProduct({
+    required String id,
+    required String name,
+    required String description,
+    required String price,
+    String? salePrice,
+    required String categoryId,
+    required bool isFeatured,
+    String? badgeText,
+    XFile? imageFile,
+    String? existingImageUrl,
+    String? token,
+  }) async {
     final request = http.MultipartRequest('POST', _u('/products/$id'));
     request.headers.addAll(_headers(token: token, multipart: true));
     
@@ -204,25 +308,15 @@ class ApiService {
       'is_featured': isFeatured ? '1' : '0',
     });
 
-    if (badgeText != null && badgeText.isNotEmpty) {
-      request.fields['badge_text'] = badgeText.trim();
-    } else {
-      request.fields['badge_text'] = '';
-    }
-
-    if (salePrice != null && salePrice.trim().isNotEmpty) {
-      request.fields['sale_price'] = salePrice.trim();
-    } else {
-      request.fields['sale_price'] = '';
-    }
+    request.fields['badge_text'] = badgeText?.trim() ?? '';
+    request.fields['sale_price'] = salePrice?.trim() ?? '';
 
     if (imageFile != null) {
       final bytes = await imageFile.readAsBytes();
       final mimeType = lookupMimeType(imageFile.path);
-      request.files.add(http.MultipartFile.fromBytes('main_image_url', bytes, filename: imageFile.name, contentType: mimeType != null ? MediaType.parse(mimeType) : null));
-    } else if (existingImageUrl != null && existingImageUrl.isNotEmpty) {
-      // If no new image is uploaded, send the existing image URL to the backend
-      request.fields['existing_main_image_url'] = existingImageUrl;
+      request.files.add(http.MultipartFile.fromBytes('image_url', bytes, filename: imageFile.name, contentType: mimeType != null ? MediaType.parse(mimeType) : null));
+    } else if (existingImageUrl != null) {
+      request.fields['image_url'] = existingImageUrl;
     }
 
     final streamedResponse = await request.send();
@@ -231,17 +325,14 @@ class ApiService {
     if (response.statusCode == 200) {
       return Product.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception('Failed to update product: ${response.statusCode} ${response.body}');
+      throw Exception(_parseError(response.statusCode, response.body));
     }
   }
 
   Future<void> deleteProduct({required String id, String? token}) async {
-    final response = await http.delete(
-      _u('/products/$id'),
-      headers: _headers(token: token),
-    );
+    final response = await http.delete(_u('/products/$id'), headers: _headers(token: token));
     if (response.statusCode != 204 && response.statusCode != 200) {
-      throw Exception('Failed to delete product: ${response.statusCode} ${response.body}');
+      throw Exception('Failed to delete product: ${response.statusCode}');
     }
   }
 }

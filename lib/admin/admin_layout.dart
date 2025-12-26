@@ -1,72 +1,81 @@
 import 'package:flutter/material.dart';
 
-class AdminLayout extends StatelessWidget {
+class AdminLayout extends StatefulWidget {
   final Widget child;
+  final String title;
+  final Widget? floatingActionButton;
 
-  const AdminLayout({required this.child, Key? key}) : super(key: key);
+  const AdminLayout({
+    required this.child,
+    this.title = 'Admin Panel',
+    this.floatingActionButton,
+    Key? key,
+  }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth > 600) {
-          // Desktop layout
-          return Scaffold(
-            body: Row(
-              children: [
-                _buildSidebar(context),
-                Expanded(child: child),
-              ],
-            ),
-          );
-        } else {
-          // Mobile layout
-          return Scaffold(
-            drawer: _buildSidebar(context),
-            body: child,
-          );
-        }
-      },
-    );
-  }
+  State<AdminLayout> createState() => _AdminLayoutState();
+}
 
-  Widget _buildSidebar(BuildContext context) {
-    return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(
-              color: Colors.indigo,
-            ),
-            child: Text(
-              'ScentView Admin',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
+class _AdminLayoutState extends State<AdminLayout> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title),
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: <Widget>[
+            const DrawerHeader(
+              decoration: BoxDecoration(
+                color: Colors.blue,
+              ),
+              child: Text(
+                'Admin Menu',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                ),
               ),
             ),
-          ),
-          _buildSidebarItem(context, Icons.dashboard, "Dashboard", '/admin/dashboard'),
-          _buildSidebarItem(context, Icons.view_carousel, "Manage Banners", '/admin/banners'),
-          _buildSidebarItem(context, Icons.category, "Manage Categories", '/admin/categories'),
-          _buildSidebarItem(context, Icons.shopping_bag, "Manage Products", '/admin/products'),
-        ],
+            ListTile(
+              leading: const Icon(Icons.dashboard),
+              title: const Text('Dashboard'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushReplacementNamed(context, '/admin/dashboard');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.shopping_bag),
+              title: const Text('Products'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushReplacementNamed(context, '/admin/products');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.category),
+              title: const Text('Categories'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushReplacementNamed(context, '/admin/categories');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.image),
+              title: const Text('Banners'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushReplacementNamed(context, '/admin/banners');
+              },
+            ),
+          ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildSidebarItem(BuildContext context, IconData icon, String title, String routeName) {
-    final currentRoute = ModalRoute.of(context)?.settings.name;
-    final isSelected = currentRoute == routeName;
-
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      selected: isSelected,
-      onTap: () {
-        Navigator.pushReplacementNamed(context, routeName);
-      },
+      body: widget.child,
+      floatingActionButton: widget.floatingActionButton,
     );
   }
 }

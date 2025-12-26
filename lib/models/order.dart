@@ -46,6 +46,8 @@ class Order {
   final List<OrderItem> items;
   final double total;
   final String status; // e.g., Placed, Shipped, Delivered
+  final String paymentMethod;
+  final String shippingAddress;
 
   Order({
     required this.id,
@@ -53,6 +55,8 @@ class Order {
     required this.items,
     required this.total,
     this.status = 'Placed',
+    required this.paymentMethod,
+    required this.shippingAddress,
   });
 
   Map<String, dynamic> toJson() => {
@@ -61,6 +65,8 @@ class Order {
     'items': items.map((e) => e.toJson()).toList(),
     'total': total,
     'status': status,
+    'paymentMethod': paymentMethod,
+    'shippingAddress': shippingAddress,
   };
 
   factory Order.fromJson(Map<String, dynamic> json) => Order(
@@ -71,5 +77,7 @@ class Order {
         .toList(),
     total: (json['total'] as num).toDouble(),
     status: json['status'] as String? ?? 'Placed',
+    paymentMethod: json['paymentMethod'] as String,
+    shippingAddress: json['shippingAddress'] as String,
   );
 }

@@ -1,57 +1,107 @@
+import 'package:scentview/models/category.dart';
 import 'package:scentview/services/api_service.dart';
 
 class Product {
   final dynamic id;
   final String name;
-  final String description;
+  final String? description;
   final double originalPrice;
   final double? salePrice;
   final String imageUrl;
   final bool isFeatured;
   final bool isSlider;
   final String? badgeText;
-  final dynamic categoryId;
-  final dynamic category;
+  final String? categoryId;
+  final Category? category;
   final Map<String, dynamic>? fragranceNotes;
   final String size;
   final String scentFamily;
   final int stock;
+  final List<String>? tags;
+  final String? brand;
+  final String? sku;
+  final bool isActive;
+  final bool hasFreeShipping;
+  final bool isTaxable;
 
   Product({
     required this.id,
     required this.name,
-    required this.description,
+    this.description,
     required this.originalPrice,
     this.salePrice,
     required this.imageUrl,
     this.isFeatured = false,
     this.isSlider = false,
     this.badgeText,
-    required this.categoryId,
+    this.categoryId,
     this.category,
     this.fragranceNotes,
     required this.size,
     required this.scentFamily,
     required this.stock,
+    this.tags,
+    this.brand,
+    this.sku,
+    this.isActive = true,
+    this.hasFreeShipping = false,
+    this.isTaxable = true,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    // Safely handle description
+    String? description;
+    if (json['description'] is String) {
+      description = json['description'];
+    } else if (json['description'] is Map) {
+      description = json['description'].toString();
+    } else {
+      description = json['description']?.toString() ?? '';
+    }
+
+    // Safely handle image URL
+    String imageUrl;
+    if (json['main_image_url'] is String) {
+      imageUrl = ApiService.toAbsoluteUrl(json['main_image_url']) ?? '';
+    } else if (json['main_image_url'] is Map) {
+      final Map<String, dynamic> imageMap = json['main_image_url'];
+      String? tempUrl;
+      if (imageMap.containsKey('url')) {
+        tempUrl = imageMap['url']?.toString();
+      } else if (imageMap.containsKey('src')) {
+        tempUrl = imageMap['src']?.toString();
+      }
+      imageUrl = ApiService.toAbsoluteUrl(tempUrl) ?? imageMap.toString();
+    } else {
+      imageUrl = '';
+    }
+
     return Product(
       id: json['id'],
-      name: json['name'] ?? '',
-      description: json['description'] ?? '',
-      originalPrice: double.tryParse(json['price'].toString()) ?? 0.0,
+      name: json['name']?.toString() ?? '',
+      description: description,
+      originalPrice: double.tryParse(json['price']?.toString() ?? '0.0') ?? 0.0,
       salePrice: json['sale_price'] != null ? double.tryParse(json['sale_price'].toString()) : null,
-      imageUrl: ApiService.toAbsoluteUrl(json['main_image_url']?.toString()) ?? '',
+      imageUrl: imageUrl,
       isFeatured: json['is_featured'] == 1 || json['is_featured'] == true,
       isSlider: json['is_slider'] == 1 || json['is_slider'] == true,
-      badgeText: json['badge_text'],
-      categoryId: json['category_id'],
-      category: json['category'],
+      badgeText: json['badge_text']?.toString(),
+      categoryId: json['category_id']?.toString(),
+      category: json['category'] != null && json['category'] is Map<String, dynamic>
+          ? Category.fromJson(json['category'])
+          : null,
       fragranceNotes: json['fragrance_notes'] is Map ? Map<String, dynamic>.from(json['fragrance_notes']) : null,
-      size: json['size'] ?? '',
-      scentFamily: json['scent_family'] ?? '',
-      stock: json['stock'] ?? 0,
+      size: json['size']?.toString() ?? '',
+      scentFamily: json['scent_family']?.toString() ?? '',
+      stock: int.tryParse(json['stock']?.toString() ?? '0') ?? 0,
+      tags: json['tags'] != null && json['tags'] is List
+          ? List<String>.from(json['tags'].map((tag) => tag.toString()))
+          : null,
+      brand: json['brand']?.toString(),
+      sku: json['sku']?.toString(),
+      isActive: json['is_active'] == 1 || json['is_active'] == true,
+      hasFreeShipping: json['has_free_shipping'] == 1 || json['has_free_shipping'] == true,
+      isTaxable: json['is_taxable'] == 1 || json['is_taxable'] == true,
     );
   }
 
@@ -67,10 +117,17 @@ class Product {
       'is_slider': isSlider,
       'badge_text': badgeText,
       'category_id': categoryId,
+      'category': category?.toMap(), // Use toMap for serialization
       'fragrance_notes': fragranceNotes,
       'size': size,
       'scent_family': scentFamily,
       'stock': stock,
+      'tags': tags,
+      'brand': brand,
+      'sku': sku,
+      'is_active': isActive,
+      'has_free_shipping': hasFreeShipping,
+      'is_taxable': isTaxable,
     }..removeWhere((key, value) => value == null);
   }
 
@@ -84,12 +141,18 @@ class Product {
     bool? isFeatured,
     bool? isSlider,
     String? badgeText,
-    dynamic categoryId,
-    dynamic category,
+    String? categoryId,
+    Category? category,
     Map<String, dynamic>? fragranceNotes,
     String? size,
     String? scentFamily,
     int? stock,
+    List<String>? tags,
+    String? brand,
+    String? sku,
+    bool? isActive,
+    bool? hasFreeShipping,
+    bool? isTaxable,
   }) {
     return Product(
       id: id ?? this.id,
@@ -107,6 +170,12 @@ class Product {
       size: size ?? this.size,
       scentFamily: scentFamily ?? this.scentFamily,
       stock: stock ?? this.stock,
+      tags: tags ?? this.tags,
+      brand: brand ?? this.brand,
+      sku: sku ?? this.sku,
+      isActive: isActive ?? this.isActive,
+      hasFreeShipping: hasFreeShipping ?? this.hasFreeShipping,
+      isTaxable: isTaxable ?? this.isTaxable,
     );
   }
 }

@@ -28,7 +28,7 @@ class OrdersService with ChangeNotifier {
     await prefs.setString(_storageKey, encoded);
   }
 
-  Future<Order> addOrder(List<Product> products) async {
+  Future<Order> addOrder(List<Product> products, {required String paymentMethod, required String shippingAddress}) async {
     final items = products.map((p) => OrderItem.fromProduct(p)).toList();
     final total = items.fold<double>(
       0.0,
@@ -39,6 +39,8 @@ class OrdersService with ChangeNotifier {
       createdAt: DateTime.now(),
       items: items,
       total: total,
+      paymentMethod: paymentMethod,
+      shippingAddress: shippingAddress,
     );
     _orders.add(order);
     await _save();

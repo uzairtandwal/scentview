@@ -22,6 +22,30 @@ class CartService with ChangeNotifier {
     notifyListeners();
   }
 
+  void updateQuantity(Product product, int quantity) {
+    final currentQuantity = getQuantity(product);
+
+    if (quantity < currentQuantity) {
+      // Remove items
+      for (int i = 0; i < currentQuantity - quantity; i++) {
+        _items.removeWhere((item) => item.id == product.id);
+      }
+    } else if (quantity > currentQuantity) {
+      // Add items
+      for (int i = 0; i < quantity - currentQuantity; i++) {
+        _items.add(product);
+      }
+    } else if (quantity == 0) {
+      // Remove all instances
+      _items.removeWhere((item) => item.id == product.id);
+    }
+    notifyListeners();
+  }
+
+  int getQuantity(Product product) {
+    return _items.where((item) => item.id == product.id).length;
+  }
+
   void clear() {
     _items.clear();
     notifyListeners();
