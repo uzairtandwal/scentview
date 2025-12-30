@@ -16,7 +16,9 @@ class Product {
   final Map<String, dynamic>? fragranceNotes;
   final String size;
   final String scentFamily;
-  final int stock;
+  // Make stock nullable if you want to distinguish between "0" and "Not Set", 
+  // but keeping it int is fine if default is 0.
+  final int stock; 
   final List<String>? tags;
   final String? brand;
   final String? sku;
@@ -93,7 +95,12 @@ class Product {
       fragranceNotes: json['fragrance_notes'] is Map ? Map<String, dynamic>.from(json['fragrance_notes']) : null,
       size: json['size']?.toString() ?? '',
       scentFamily: json['scent_family']?.toString() ?? '',
+      
+      // === STOCK PARSING ===
+      // This line ensures that even if the server sends the number as a string "100", 
+      // or an int 100, or null, it handles it correctly.
       stock: int.tryParse(json['stock']?.toString() ?? '0') ?? 0,
+      
       tags: json['tags'] != null && json['tags'] is List
           ? List<String>.from(json['tags'].map((tag) => tag.toString()))
           : null,
@@ -117,11 +124,11 @@ class Product {
       'is_slider': isSlider,
       'badge_text': badgeText,
       'category_id': categoryId,
-      'category': category?.toMap(), // Use toMap for serialization
+      'category': category?.toMap(), 
       'fragrance_notes': fragranceNotes,
       'size': size,
       'scent_family': scentFamily,
-      'stock': stock,
+      'stock': stock, // Sending stock back if needed
       'tags': tags,
       'brand': brand,
       'sku': sku,

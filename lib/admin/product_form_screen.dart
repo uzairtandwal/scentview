@@ -160,7 +160,6 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) {
-      // Scroll to first error
       await Future.delayed(const Duration(milliseconds: 100));
       final context = _formKey.currentContext;
       if (context != null) {
@@ -216,6 +215,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           categoryId: _selectedCategoryId!,
           isFeatured: _isFeatured,
           badgeText: _badgeController.text,
+          stock: _stockController.text, // <-- FIX: Sending Stock
           imageFile: _pickedImage,
           token: token,
         );
@@ -232,6 +232,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           categoryId: _selectedCategoryId!,
           isFeatured: _isFeatured,
           badgeText: _badgeController.text,
+          stock: _stockController.text, // <-- FIX: Sending Stock
           imageFile: _pickedImage,
           existingImageUrl: _pickedImage == null ? widget.product!.imageUrl : null,
           token: token,
@@ -1158,4 +1159,4 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       ),
     );
   }
-}
+} 

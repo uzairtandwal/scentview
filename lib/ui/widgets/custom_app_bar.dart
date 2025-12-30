@@ -11,6 +11,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String? hintText;
   final Color? backgroundColor;
   final bool showLogo;
+  final VoidCallback? onMenuTap; // <-- ADDED FOR MENU
   
   const CustomAppBar({
     super.key,
@@ -18,6 +19,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.hintText,
     this.backgroundColor,
     this.showLogo = true,
+    this.onMenuTap, // <-- ADDED
   });
 
   @override
@@ -32,17 +34,29 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       surfaceTintColor: Colors.transparent,
       title: Row(
         children: [
-          // ================ APP LOGO ================
-          if (showLogo)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: AppLogo(
-                size: 38,
-                backgroundColor: Colors.white.withOpacity(0.1),
-                tintColor: Colors.white,
-                padding: const EdgeInsets.all(6),
-              ),
+          // ================ MENU BUTTON (HAMBURGER ICON) ================
+          Container(
+            width: 44,
+            height: 44,
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              shape: BoxShape.circle,
             ),
+            child: IconButton(
+              icon: const Icon(
+                Icons.menu_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+              tooltip: 'Menu',
+              onPressed: onMenuTap ?? () {
+                // Default behavior: open drawer if available
+                Scaffold.of(context).openDrawer();
+              },
+              splashRadius: 24,
+            ),
+          ),
           
           // ================ SEARCH BAR ================
           if (showSearch)
@@ -111,6 +125,18 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
             ),
+          
+          // ================ APP LOGO ================
+          if (showLogo)
+            Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: AppLogo(
+                size: 38,
+                backgroundColor: Colors.white.withOpacity(0.1),
+                tintColor: Colors.white,
+                padding: const EdgeInsets.all(6),
+              ),
+            ),
         ],
       ),
       // ================ ACTION BUTTONS ================
@@ -130,7 +156,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
-                    icon: Icon(
+                    icon: const Icon(
                       Icons.shopping_cart_outlined,
                       color: Colors.white,
                       size: 22,
@@ -197,7 +223,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             shape: BoxShape.circle,
           ),
           child: IconButton(
-            icon: Icon(
+            icon: const Icon(
               Icons.person_outline,
               color: Colors.white,
               size: 22,

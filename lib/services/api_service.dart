@@ -12,19 +12,28 @@ class ApiService {
   final String baseUrl;
   static String? authToken;
   
-  // Base URL for images (Database path)
-  static const String imageBaseUrl = 'https://scentview.alwaysdata.net/storage/uploads/';
+  // Base Domain
+  static const String domainUrl = 'https://scentview.alwaysdata.net';
 
   ApiService({this.baseUrl = 'https://scentview.alwaysdata.net/api'});
 
   Uri _u(String path) => Uri.parse('$baseUrl$path');
 
-  // Helper for reading URLs
+  // ✅ FIX: The Smart URL Builder (تصویر کے لنک کا پکا حل)
   static String? toAbsoluteUrl(String? relativeUrl) {
     if (relativeUrl == null || relativeUrl.isEmpty) return null;
+    
+    // 1. اگر لنک پہلے سے مکمل ہے
     if (relativeUrl.startsWith('http')) return relativeUrl;
-    // Fallback if needed
-    return '$imageBaseUrl$relativeUrl'; 
+    
+    // 2. اگر لنک ڈیٹا بیس سے "/storage/..." آ رہا ہے (جو آپ کے لاگ میں ہے)
+    if (relativeUrl.startsWith('/storage')) {
+       return '$domainUrl$relativeUrl'; 
+    }
+    
+    // 3. اگر لنک ڈیٹا بیس سے صرف "uploads/..." آ رہا ہے
+    // تو ہمیں /storage/ خود لگانا پڑے گا
+    return '$domainUrl/storage/$relativeUrl'; 
   }
 
   Map<String, String> _headers({bool json = false, bool multipart = false, String? token}) {
@@ -45,9 +54,17 @@ class ApiService {
     try {
       final body = jsonDecode(responseBody);
       if (body is Map && body.containsKey('message')) {
+        if (body.containsKey('errors')) {
+           return "${body['message']}: ${body['errors'].toString()}";
+        }
         return body['message'];
       }
-    } catch (_) {}
+      if (body is Map && body.containsKey('errors')) {
+         return body['errors'].toString();
+      }
+    } catch (_) {
+      return "Status $statusCode: $responseBody";
+    }
     return 'Request failed with status: $statusCode';
   }
 
@@ -95,7 +112,7 @@ class ApiService {
     if (res.statusCode >= 300) throw Exception('Delete category failed');
   }
 
-  // ================ BANNER METHODS (CLEAN VERSION) ================
+  // ================ BANNER METHODS ================
   Future<List<model.Banner>> fetchBanners() async {
     try {
       final res = await http.get(_u('/banners'), headers: _headers());
@@ -103,7 +120,6 @@ class ApiService {
       final List data = jsonDecode(res.body) as List;
       return data.map((e) => model.Banner.fromJson(e)).toList();
     } catch (e) {
-      print('Error fetching banners: $e');
       rethrow;
     }
   }
@@ -118,43 +134,34 @@ class ApiService {
     String? description,
     String? token,
   }) async {
-    try {
-      var request = http.MultipartRequest('POST', _u('/banners'));
-      request.headers.addAll(_headers(multipart: true, token: token));
-      
-      request.fields['title'] = title;
-      if (targetScreen != null) request.fields['target_screen'] = targetScreen;
-      if (targetId != null) request.fields['target_id'] = targetId;
-      if (description != null) request.fields['description'] = description;
-      request.fields['sort_order'] = sortOrder.toString();
-      request.fields['is_active'] = isActive ? '1' : '0';
-      
-      // === CLEANUP ===
-      // Hum yahan se koi image_url string nahi bhej rahe.
-      // Sirf FILE bhej rahe hain 'image' key par.
-      // Server khud handle karega.
-      
-      final bytes = await imageFile.readAsBytes();
-      final mimeType = lookupMimeType(imageFile.path);
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'image', 
-          bytes,
-          filename: imageFile.name,
-          contentType: mimeType != null ? MediaType.parse(mimeType) : null,
-        ),
-      );
-      
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return jsonDecode(responseBody) as Map<String, dynamic>;
-      } else {
-        throw Exception(_parseError(response.statusCode, responseBody));
-      }
-    } catch (e) {
-      rethrow;
+    var request = http.MultipartRequest('POST', _u('/banners'));
+    request.headers.addAll(_headers(multipart: true, token: token));
+    
+    request.fields['title'] = title;
+    if (targetScreen != null) request.fields['target_screen'] = targetScreen;
+    if (targetId != null) request.fields['target_id'] = targetId;
+    if (description != null) request.fields['description'] = description;
+    request.fields['sort_order'] = sortOrder.toString();
+    request.fields['is_active'] = isActive ? '1' : '0';
+    
+    final bytes = await imageFile.readAsBytes();
+    final mimeType = lookupMimeType(imageFile.path);
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'image', // ✅ Correct for Banner
+        bytes,
+        filename: imageFile.name,
+        contentType: mimeType != null ? MediaType.parse(mimeType) : null,
+      ),
+    );
+    
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return jsonDecode(responseBody) as Map<String, dynamic>;
+    } else {
+      throw Exception(_parseError(response.statusCode, responseBody));
     }
   }
 
@@ -170,44 +177,37 @@ class ApiService {
     String? currentImageUrl,
     String? token,
   }) async {
-    try {
-      var request = http.MultipartRequest('POST', _u('/banners/$id'));
-      request.fields['_method'] = 'PUT';
-      request.headers.addAll(_headers(multipart: true, token: token));
-      
-      request.fields['title'] = title;
-      if (targetScreen != null) request.fields['target_screen'] = targetScreen;
-      if (targetId != null) request.fields['target_id'] = targetId;
-      if (description != null) request.fields['description'] = description;
-      if (sortOrder != null) request.fields['sort_order'] = sortOrder.toString();
-      if (isActive != null) request.fields['is_active'] = isActive ? '1' : '0';
-      
-      if (imageFile != null) {
-        // === CLEANUP ===
-        // Update mein bhi sirf file bhej rahe hain.
-        final bytes = await imageFile.readAsBytes();
-        final mimeType = lookupMimeType(imageFile.path);
-        request.files.add(
-          http.MultipartFile.fromBytes(
-            'image', 
-            bytes,
-            filename: imageFile.name,
-            contentType: mimeType != null ? MediaType.parse(mimeType) : null,
-          ),
-        );
-      } 
-      // Agar image null hai to kuch nahi bhej rahe, server purana link rakhega.
-      
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return jsonDecode(responseBody) as Map<String, dynamic>;
-      } else {
-        throw Exception(_parseError(response.statusCode, responseBody));
-      }
-    } catch (e) {
-      rethrow;
+    var request = http.MultipartRequest('POST', _u('/banners/$id'));
+    request.fields['_method'] = 'PUT';
+    request.headers.addAll(_headers(multipart: true, token: token));
+    
+    request.fields['title'] = title;
+    if (targetScreen != null) request.fields['target_screen'] = targetScreen;
+    if (targetId != null) request.fields['target_id'] = targetId;
+    if (description != null) request.fields['description'] = description;
+    if (sortOrder != null) request.fields['sort_order'] = sortOrder.toString();
+    if (isActive != null) request.fields['is_active'] = isActive ? '1' : '0';
+    
+    if (imageFile != null) {
+      final bytes = await imageFile.readAsBytes();
+      final mimeType = lookupMimeType(imageFile.path);
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'image', // ✅ Correct for Banner
+          bytes,
+          filename: imageFile.name,
+          contentType: mimeType != null ? MediaType.parse(mimeType) : null,
+        ),
+      );
+    } 
+    
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return jsonDecode(responseBody) as Map<String, dynamic>;
+    } else {
+      throw Exception(_parseError(response.statusCode, responseBody));
     }
   }
 
@@ -242,6 +242,7 @@ class ApiService {
     return data.map((e) => Product.fromJson(e)).toList();
   }
 
+  // === PRODUCT ADD FUNCTION ===
   Future<Product> addProduct({
     required String name,
     required String description,
@@ -250,12 +251,16 @@ class ApiService {
     required String categoryId,
     required bool isFeatured,
     String? badgeText,
+    String? stock,
     XFile? imageFile,
     String? token,
   }) async {
     final request = http.MultipartRequest('POST', _u('/products'));
     request.headers.addAll(_headers(token: token, multipart: true));
     
+    // Debug
+    print("🚀 Adding Product: $name");
+
     request.fields.addAll({
       'name': name,
       'description': description,
@@ -264,17 +269,36 @@ class ApiService {
       'is_featured': isFeatured ? '1' : '0',
     });
 
-    if (badgeText != null) request.fields['badge_text'] = badgeText.trim();
-    if (salePrice != null) request.fields['sale_price'] = salePrice.trim();
+    if (stock != null && stock.isNotEmpty) {
+      request.fields['stock'] = stock.trim();
+    } else {
+      request.fields['stock'] = '0';
+    }
+
+    if (badgeText != null) {
+      request.fields['badge_text'] = badgeText.trim();
+    }
+    
+    if (salePrice != null && salePrice.isNotEmpty) {
+      request.fields['sale_price'] = salePrice.trim();
+    }
 
     if (imageFile != null) {
       final bytes = await imageFile.readAsBytes();
       final mimeType = lookupMimeType(imageFile.path);
-      request.files.add(http.MultipartFile.fromBytes('image_url', bytes, filename: imageFile.name, contentType: mimeType != null ? MediaType.parse(mimeType) : null));
+      request.files.add(http.MultipartFile.fromBytes(
+        'main_image', // FIX: Match backend expectation
+        bytes, 
+        filename: imageFile.name, 
+        contentType: mimeType != null ? MediaType.parse(mimeType) : null
+      ));
     }
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
+
+    print("📡 STATUS: ${response.statusCode}");
+    print("📩 RESPONSE: ${response.body}");
 
     if (response.statusCode == 201 || response.statusCode == 200) {
       return Product.fromJson(jsonDecode(response.body));
@@ -283,6 +307,7 @@ class ApiService {
     }
   }
 
+  // === PRODUCT UPDATE FUNCTION ===
   Future<Product> updateProduct({
     required String id,
     required String name,
@@ -292,6 +317,7 @@ class ApiService {
     required String categoryId,
     required bool isFeatured,
     String? badgeText,
+    String? stock, 
     XFile? imageFile,
     String? existingImageUrl,
     String? token,
@@ -308,15 +334,27 @@ class ApiService {
       'is_featured': isFeatured ? '1' : '0',
     });
 
-    request.fields['badge_text'] = badgeText?.trim() ?? '';
-    request.fields['sale_price'] = salePrice?.trim() ?? '';
+    if (stock != null && stock.isNotEmpty) {
+      request.fields['stock'] = stock.trim();
+    }
+
+    if (badgeText != null) {
+      request.fields['badge_text'] = badgeText.trim();
+    }
+    
+    if (salePrice != null && salePrice.trim().isNotEmpty) {
+      request.fields['sale_price'] = salePrice.trim();
+    }
 
     if (imageFile != null) {
       final bytes = await imageFile.readAsBytes();
       final mimeType = lookupMimeType(imageFile.path);
-      request.files.add(http.MultipartFile.fromBytes('image_url', bytes, filename: imageFile.name, contentType: mimeType != null ? MediaType.parse(mimeType) : null));
-    } else if (existingImageUrl != null) {
-      request.fields['image_url'] = existingImageUrl;
+      request.files.add(http.MultipartFile.fromBytes(
+        'main_image', // FIX: Match backend expectation
+        bytes, 
+        filename: imageFile.name, 
+        contentType: mimeType != null ? MediaType.parse(mimeType) : null
+      ));
     }
 
     final streamedResponse = await request.send();

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' hide Category;
+import 'package:flutter/services.dart';
 import 'package:scentview/models/product_model.dart';
 import 'package:scentview/ui/product_list_screen.dart';
 import '../models/banner.dart' as model;
@@ -18,8 +19,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final ApiService _api = ApiService();
-  
-  // Drawer Key added to open drawer from custom header
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   Future<void>? _dataLoadingFuture;
@@ -34,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _errorMessage = '';
 
   late bool _isMobile;
+  bool _hasShownSalePopup = false; // ADDED: Track if popup shown
 
   @override
   void initState() {
@@ -48,16 +48,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      final categoriesFuture = _api.fetchCategories();
-      final featuredProductsFuture = _api.fetchFeaturedProducts();
-      final bannersFuture = _api.fetchBanners();
-      final allProductsFuture = _api.fetchProducts();
-
       final results = await Future.wait([
-        categoriesFuture,
-        featuredProductsFuture,
-        bannersFuture,
-        allProductsFuture,
+        _api.fetchCategories(),
+        _api.fetchFeaturedProducts(),
+        _api.fetchBanners(),
+        _api.fetchProducts(),
       ]);
 
       setState(() {
@@ -68,6 +63,10 @@ class _HomeScreenState extends State<HomeScreen> {
         _filteredProducts = _allProducts;
         _isLoading = false;
       });
+
+      // ✅ ADDED: Show sale popup after data loads
+      _showSalePopupIfNeeded();
+
     } catch (e) {
       setState(() {
         _hasError = true;
@@ -96,62 +95,229 @@ class _HomeScreenState extends State<HomeScreen> {
     _isMobile = MediaQuery.of(context).size.width < 600;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey, // Assign the key to Scaffold
-      backgroundColor: Colors.white,
-      
-      // ================ SIDE DRAWER ================
-      drawer: Drawer(
-        child: Column(
-          children: [
-            UserAccountsDrawerHeader(
-              decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary),
-              accountName: const Text("ScentView"),
-              accountEmail: const Text("Welcome to our store"),
-              currentAccountPicture: const CircleAvatar(
-                backgroundColor: Colors.white,
-                child: Icon(Icons.store, color: Colors.deepPurple, size: 30),
+  // ✅ ADDED: Sale Popup Functions
+  void _showSalePopupIfNeeded() {
+    if (_hasShownSalePopup) return;
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted || _allProducts.isEmpty) return;
+
+      final saleProducts = _allProducts.where((product) {
+        return product.salePrice != null &&
+               product.salePrice! > 0 &&
+               product.salePrice! < product.originalPrice;
+      }).toList();
+
+      if (saleProducts.isNotEmpty && mounted && !_hasShownSalePopup) {
+        _hasShownSalePopup = true;
+        _showSaleDialog(saleProducts.first);
+      }
+    });
+  }
+
+  void _showSaleDialog(Product product) {
+    final discount = ((product.originalPrice - product.salePrice!) /
+        product.originalPrice * 100).round();
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.local_fire_department, color: Colors.red),
+              const SizedBox(width: 10),
+              const Text('HOT DEAL!',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                    fontSize: 18,
+                  )),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                height: 100,
+                width: 100,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  image: product.imageUrl.isNotEmpty
+                      ? DecorationImage(
+                          image: NetworkImage(product.imageUrl),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                  color: Colors.grey[200],
+                ),
               ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _categories.length,
-                itemBuilder: (context, index) {
-                  final cat = _categories[index];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.grey.shade200,
-                      backgroundImage: NetworkImage(cat.imageUrl ?? ''),
-                      onBackgroundImageError: (_, __) {},
-                      child: const Icon(Icons.category, size: 16, color: Colors.grey),
+              const SizedBox(height: 15),
+              Text(
+                product.name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Rs ${product.originalPrice.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      decoration: TextDecoration.lineThrough,
+                      color: Colors.grey,
+                      fontSize: 14,
                     ),
-                    title: Text(cat.name),
-                    onTap: () {
-                      Navigator.pop(context); // Close drawer
-                      Navigator.pushNamed(
-                        context,
-                        ProductListScreen.routeName,
-                        arguments: ProductListArgs(categoryKey: cat.id),
-                      );
-                    },
-                  );
-                },
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text(
+                      '$discount% OFF',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 5),
+              Text(
+                'Rs ${product.salePrice!.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Limited time offer!',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close', style: TextStyle(fontSize: 15)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ProductDetailScreen(
+                      product: product,
+                      allProducts: _allProducts,
+                    ),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('View Product', style: TextStyle(fontSize: 15)),
             ),
           ],
-        ),
-      ),
+        );
+      },
+    );
+  }
 
-      body: SafeArea(
-        child: Column(
+  @override
+  Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
+    
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: Colors.white,
+        
+        // ================ SIDE DRAWER ================
+        drawer: Drawer(
+          width: MediaQuery.of(context).size.width * 0.85,
+          child: Column(
+            children: [
+              UserAccountsDrawerHeader(
+                decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary),
+                accountName: const Text("ScentView"),
+                accountEmail: const Text("Welcome to our store"),
+                currentAccountPicture: const CircleAvatar(
+                  backgroundColor: Colors.white,
+                  child: Icon(Icons.store, color: Colors.deepPurple, size: 30),
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _categories.length,
+                  itemBuilder: (context, index) {
+                    final cat = _categories[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.grey.shade200,
+                        backgroundImage: NetworkImage(cat.imageUrl ?? ''),
+                        onBackgroundImageError: (_, __) {},
+                        child: const Icon(Icons.category, size: 16, color: Colors.grey),
+                      ),
+                      title: Text(cat.name),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(
+                          context,
+                          ProductListScreen.routeName,
+                          arguments: ProductListArgs(categoryKey: cat.id),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // ================ MAIN BODY ================
+        body: Column(
           children: [
             
-            // ================ NEW FIXED TOP HEADER ================
-            // Logo + Search Bar + Profile Icon
+            // --- STATUS BAR SPACER ---
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              color: Colors.white, 
+              height: topPadding, 
+            ),
+
+            // ================ CUSTOM HEADER ================
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border(
@@ -167,58 +333,62 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Row(
                 children: [
-                  // 1. APP LOGO
-                  Container(
-                    height: 40,
-                    width: 40,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: Text(
-                        "SV",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                  // 1. MENU BUTTON
+                  InkWell(
+                    onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Icon(
+                        Icons.menu,
+                        color: Colors.grey.shade700,
+                        size: 22,
                       ),
                     ),
                   ),
                   
                   const SizedBox(width: 12),
                   
-                  // 2. SEARCH BAR (Expanded to take remaining space)
+                  // 2. SEARCH BAR
                   Expanded(
                     child: Container(
                       height: 40,
                       decoration: BoxDecoration(
                         color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(25),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.grey.shade300),
                       ),
                       child: Row(
                         children: [
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 12),
                           Icon(
                             Icons.search,
                             color: Colors.grey.shade600,
                             size: 20,
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: TextField(
                               decoration: InputDecoration(
-                                hintText: 'Search perfumes, brands...',
+                                hintText: 'Search perfumes...',
                                 hintStyle: TextStyle(
                                   color: Colors.grey.shade600,
-                                  fontSize: 14,
+                                  fontSize: 15,
                                 ),
                                 border: InputBorder.none,
-                                contentPadding: EdgeInsets.zero,
+                                contentPadding: const EdgeInsets.only(bottom: 2),
+                                isDense: true,
                               ),
-                              style: const TextStyle(fontSize: 14),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                height: 1.2,
+                              ),
                             ),
                           ),
                         ],
@@ -226,29 +396,25 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   
-                  // 3. PROFILE ICON
+                  // 3. APP LOGO
                   InkWell(
-                    onTap: () {
-                      // TODO: Navigate to Profile Screen
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Profile coming soon!")),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(20),
+                    onTap: _loadAllData,
+                    borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      width: 40,
-                      height: 40,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey.shade300),
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(
-                        Icons.person_outline,
-                        color: Colors.grey.shade700,
-                        size: 22,
+                      child: const Text(
+                        "SV",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -256,16 +422,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // ================ SCROLLABLE BODY ================
+            // ================ SCROLLABLE CONTENT ================
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _loadAllData,
                 color: Theme.of(context).colorScheme.primary,
                 backgroundColor: Theme.of(context).colorScheme.surface,
                 child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   slivers: [
                     
-                    // Loading State
                     if (_isLoading)
                       SliverFillRemaining(
                         child: Center(
@@ -275,7 +441,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // Error State
                     if (_hasError && !_isLoading)
                       SliverFillRemaining(
                         child: Center(
@@ -295,111 +460,38 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // Content State
                     if (!_isLoading && !_hasError)
                       SliverList(
                         delegate: SliverChildListDelegate([
                           const SizedBox(height: 8),
 
-                          // 1. BANNER SECTION (Immediately after header)
+                          // 1. BANNER SECTION
                           if (_banners.isNotEmpty)
                             Container(
                               margin: const EdgeInsets.only(bottom: 24, top: 8),
                               child: BannerCarousel(
                                 banners: _banners,
-                                onTap: (banner) {
-                                  // Handle Banner Tap
-                                },
+                                onTap: (_) {},
                                 height: _isMobile ? 180 : 220,
                                 showIndicators: true,
                                 autoPlay: true,
                               ),
                             ),
 
-                          // 2. CATEGORIES SECTION
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 32),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          // 2. FEATURED PRODUCTS
+                          if (_featuredProducts.isNotEmpty)
+                            Column(
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 20),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        'Categories',
-                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      // Menu button for categories (drawer)
-                                      InkWell(
-                                        onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey.shade100,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.menu,
-                                                size: 18,
-                                                color: Colors.grey.shade700,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                'Menu',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.grey.shade700,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildCategoryList(),
-                              ],
-                            ),
-                          ),
-
-                          // 3. FEATURED PRODUCTS
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 32),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Featured Products',
-                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
+                                      Text('Featured Products', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                                       if (_featuredProducts.length > 4)
                                         TextButton(
                                           onPressed: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) => ProductListScreen(
-                                                  initialProducts: _featuredProducts,
-                                                  screenTitle: 'Featured Products',
-                                                ),
-                                              ),
-                                            );
+                                            Navigator.push(context, MaterialPageRoute(builder: (_) => ProductListScreen(initialProducts: _featuredProducts, screenTitle: 'Featured')));
                                           },
                                           child: const Text('View All'),
                                         ),
@@ -408,8 +500,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                                 const SizedBox(height: 12),
                                 _buildProductCarousel(_featuredProducts),
+                                const SizedBox(height: 32),
                               ],
                             ),
+
+                          // 3. CATEGORIES SECTION
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                child: Text('Categories', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                              ),
+                              const SizedBox(height: 12),
+                              _buildCategoryList(),
+                              const SizedBox(height: 32),
+                            ],
                           ),
 
                           // 4. ALL PRODUCTS SECTION
@@ -423,12 +529,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        'All Products',
-                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
+                                      Text('All Products', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                                       Badge(
                                         label: Text(_filteredProducts.length.toString()),
                                         backgroundColor: Theme.of(context).colorScheme.primary,
@@ -443,15 +544,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
 
-                          // Empty State for Filter
                           if (_filteredProducts.isEmpty)
-                            Container(
-                              padding: const EdgeInsets.all(40),
-                              alignment: Alignment.center,
-                              child: const Text("No products found in this category"),
-                            ),
+                            const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("No products found"))),
                             
-                          const SizedBox(height: 20),
+                          SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
                         ]),
                       ),
                   ],
@@ -465,41 +561,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildProductCarousel(List<Product> products) {
-    if (products.isEmpty) {
-      return const SizedBox(
-        height: 100, 
-        child: Center(child: Text("No featured products"))
-      );
-    }
-    
+    if (products.isEmpty) return const SizedBox.shrink();
     return SizedBox(
       height: _isMobile ? 280 : 320,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: products.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 16),
+        separatorBuilder: (_, __) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
           return SizedBox(
             width: _isMobile ? 170 : 200,
             child: ProductCard(
               product: products[index],
               isCompact: _isMobile,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ProductDetailScreen(
-                      product: products[index],
-                      allProducts: _allProducts,
-                    ),
-                  ),
-                );
-              },
-              showFavorite: true,
-              onFavoriteTap: () {},
-              showQuickAdd: true,
-              onQuickAddTap: () {},
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailScreen(product: products[index], allProducts: _allProducts))),
+              showFavorite: true, showQuickAdd: true, onFavoriteTap: () {}, onQuickAddTap: () {},
             ),
           );
         },
@@ -509,33 +586,30 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildCategoryList() {
     if (_categories.isEmpty) return const SizedBox.shrink();
-    
     return SizedBox(
       height: 56,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: _categories.length + 1,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           if (index == 0) {
             final isSelected = _selectedCategoryId == null;
             return ChoiceChip(
               label: const Text('All'),
               selected: isSelected,
-              onSelected: (selected) => _filterProductsByCategory(null),
+              onSelected: (_) => _filterProductsByCategory(null),
               selectedColor: Theme.of(context).colorScheme.primary,
               labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
             );
           }
-
-          final category = _categories[index - 1];
-          final isSelected = _selectedCategoryId == category.id;
-
+          final cat = _categories[index - 1];
+          final isSelected = _selectedCategoryId == cat.id;
           return ChoiceChip(
-            label: Text(category.name),
+            label: Text(cat.name),
             selected: isSelected,
-            onSelected: (selected) => _filterProductsByCategory(category.id),
+            onSelected: (_) => _filterProductsByCategory(cat.id),
             selectedColor: Theme.of(context).colorScheme.primary,
             labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
           );
@@ -545,17 +619,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   
   Widget _buildProductsGrid() {
-    if (_filteredProducts.isEmpty) return const SizedBox.shrink();
-    
+    if (_filteredProducts.isEmpty) return const Center(child: Text("No products found"));
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: _isMobile ? 2 : 4,
+        crossAxisCount: _isMobile ? 1 : 4, // 1 for Mobile
         crossAxisSpacing: 12,
         mainAxisSpacing: 16,
-        childAspectRatio: 0.72,
+        // YEH HAI CORRECT SETTING (0.75)
+        // Is se card vertical (lamba) ho jaye ga, aur screen par 1.5 ya 2 cards nazar ayen ge.
+        childAspectRatio: _isMobile ? 0.75 : 0.72, 
       ),
       itemCount: _filteredProducts.length,
       itemBuilder: (context, index) {
@@ -563,21 +638,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return ProductCard(
           product: product,
           isCompact: false,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ProductDetailScreen(
-                  product: product,
-                  allProducts: _allProducts,
-                ),
-              ),
-            );
-          },
-          showFavorite: true,
-          onFavoriteTap: () {},
-          showQuickAdd: true,
-          onQuickAddTap: () {},
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product, allProducts: _allProducts))),
+          showFavorite: true, showQuickAdd: true, onFavoriteTap: () {}, onQuickAddTap: () {},
         );
       },
     );
