@@ -21,11 +21,11 @@ class Banner {
     this.sortOrder = 0,
   });
 
+  // === EXISTING LOGIC (SAME AS BEFORE) ===
   factory Banner.fromMap(Map<String, dynamic> data, String documentId) {
     return Banner(
       id: documentId,
       title: data['title'] ?? '',
-      // FIX: Yahan URL theek ho raha hai
       imageUrl: _fixUrl(data['imageUrl']), 
       targetScreen: data['targetScreen'] ?? '',
       targetId: data['targetId'] ?? '',
@@ -40,10 +40,7 @@ class Banner {
     return Banner(
       id: json['id']?.toString() ?? '',
       title: json['title'] ?? '',
-      
-      // FIX: Yahan URL check aur fix ho raha hai
       imageUrl: _fixUrl(json['image_url'] ?? json['imageUrl']),
-      
       targetScreen: json['target_screen'] ?? json['targetScreen'] ?? '',
       targetId: json['target_id']?.toString() ?? json['targetId']?.toString() ?? '',
       isActive: json['is_active'] == 1 || 
@@ -91,21 +88,44 @@ class Banner {
     };
   }
 
-  // === HELPER FUNCTION TO FIX BROKEN IMAGES ===
+  // === NEW: DATABASE METHODS (OFFLINE KE LIYE) ===
+  
+  // DB se Model banana
+  factory Banner.fromDbMap(Map<String, dynamic> map) {
+    return Banner(
+      id: map['id'].toString(),
+      title: map['title'] ?? '',
+      imageUrl: map['image_url'], // DB mein already fixed URL hoga
+      targetScreen: map['target_screen'] ?? '',
+      targetId: map['target_id'] ?? '',
+      isActive: map['is_active'] == 1,
+      description: map['description'],
+      sortOrder: map['sort_order'] ?? 0,
+    );
+  }
+
+  // Model ko DB format mein convert karna
+  Map<String, dynamic> toDbMap() {
+    return {
+      'id': id, // Save ID as string/text
+      'title': title,
+      'image_url': imageUrl,
+      'target_screen': targetScreen,
+      'target_id': targetId,
+      'is_active': isActive ? 1 : 0,
+      'description': description,
+      'sort_order': sortOrder,
+    };
+  }
+
+  // === HELPER FUNCTION (SAME AS BEFORE) ===
   static String? _fixUrl(String? url) {
     if (url == null || url.isEmpty) return null;
-    
-    // 1. Agar URL pehle se theek hai (http/https se shuru ho raha hai), to waisa hi rehne do
     if (url.startsWith('http')) return url;
-
-    // 2. Safai: Agar shuru mein '/' laga hai to hata do
     String cleanPath = url;
     if (cleanPath.startsWith('/')) {
       cleanPath = cleanPath.substring(1);
     }
-    
-    // 3. Agar URL sirf filename hai (e.g., scaled_banner_1.webp), to uske shuru mein sahi domain aur folder lagao.
-    // Aap ke database screenshot ke mutabiq folder 'storage/uploads/' hai.
     return 'https://scentview.alwaysdata.net/storage/uploads/$cleanPath';
   }
 }

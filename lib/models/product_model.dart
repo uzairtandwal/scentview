@@ -1,3 +1,4 @@
+import 'dart:convert'; // ✅ JSON Encode/Decode ke liye zaroori
 import 'package:scentview/models/category.dart';
 import 'package:scentview/services/api_service.dart';
 
@@ -16,9 +17,7 @@ class Product {
   final Map<String, dynamic>? fragranceNotes;
   final String size;
   final String scentFamily;
-  // Make stock nullable if you want to distinguish between "0" and "Not Set", 
-  // but keeping it int is fine if default is 0.
-  final int stock; 
+  final int stock;
   final List<String>? tags;
   final String? brand;
   final String? sku;
@@ -50,6 +49,7 @@ class Product {
     this.isTaxable = true,
   });
 
+  // ==================== 1. API PARSING (Jaisa aapka pehle tha) ====================
   factory Product.fromJson(Map<String, dynamic> json) {
     // Safely handle description
     String? description;
@@ -95,12 +95,7 @@ class Product {
       fragranceNotes: json['fragrance_notes'] is Map ? Map<String, dynamic>.from(json['fragrance_notes']) : null,
       size: json['size']?.toString() ?? '',
       scentFamily: json['scent_family']?.toString() ?? '',
-      
-      // === STOCK PARSING ===
-      // This line ensures that even if the server sends the number as a string "100", 
-      // or an int 100, or null, it handles it correctly.
       stock: int.tryParse(json['stock']?.toString() ?? '0') ?? 0,
-      
       tags: json['tags'] != null && json['tags'] is List
           ? List<String>.from(json['tags'].map((tag) => tag.toString()))
           : null,
@@ -112,6 +107,50 @@ class Product {
     );
   }
 
+  // ==================== 2. DATABASE PARSING (Offline ke liye) ====================
+  // Ye function SQLite DB se data parh kar Model banata hai
+  factory Product.fromMap(Map<String, dynamic> map) {
+    return Product(
+      id: map['id'],
+      categoryId: map['category_id']?.toString(),
+      name: map['name'],
+      description: map['description'],
+      originalPrice: double.tryParse(map['price'].toString()) ?? 0.0,
+      salePrice: map['sale_price'] != null ? double.tryParse(map['sale_price'].toString()) : null,
+      stock: map['stock'] ?? 0,
+      badgeText: map['badge_text'],
+      isFeatured: map['is_featured'] == 1,
+      imageUrl: map['main_image_url'] ?? '',
+      // Complex types (JSON se Map banate hain)
+      fragranceNotes: map['fragrance_notes'] != null ? jsonDecode(map['fragrance_notes']) : null,
+      // Default empty values for fields not in DB schema yet
+      size: '', 
+      scentFamily: '',
+      isSlider: false,
+    );
+  }
+
+  // ==================== 3. SAVE TO DATABASE (Offline ke liye) ====================
+  // Ye function Model ko Database format mein convert karta hai
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'category_id': categoryId != null ? int.tryParse(categoryId!) : null,
+      'name': name,
+      'description': description,
+      'price': originalPrice.toString(),
+      'sale_price': salePrice?.toString(),
+      'stock': stock,
+      'badge_text': badgeText,
+      // SQLite mein boolean nahi hota, 1 ya 0 store karte hain
+      'is_featured': isFeatured ? 1 : 0, 
+      'main_image_url': imageUrl,
+      // Map ko String bana kar save karte hain
+      'fragrance_notes': fragranceNotes != null ? jsonEncode(fragranceNotes) : null,
+    };
+  }
+
+  // ==================== 4. SEND TO API (Purana) ====================
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -124,11 +163,11 @@ class Product {
       'is_slider': isSlider,
       'badge_text': badgeText,
       'category_id': categoryId,
-      'category': category?.toMap(), 
+      'category': category?.toMap(),
       'fragrance_notes': fragranceNotes,
       'size': size,
       'scent_family': scentFamily,
-      'stock': stock, // Sending stock back if needed
+      'stock': stock,
       'tags': tags,
       'brand': brand,
       'sku': sku,

@@ -9,6 +9,7 @@ import 'widgets/banner_carousel.dart';
 import 'widgets/product_card.dart';
 import 'product_detail_screen.dart';
 
+
 class HomeScreen extends StatefulWidget {
   static const routeName = '/home';
   const HomeScreen({super.key});

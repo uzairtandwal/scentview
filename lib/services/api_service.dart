@@ -7,11 +7,15 @@ import 'package:scentview/models/product_model.dart';
 import 'package:scentview/models/category.dart' as app_category;
 import 'package:scentview/models/banner.dart' as model;
 import 'package:flutter/foundation.dart';
+import 'package:connectivity_plus/connectivity_plus.dart'; 
+import 'package:scentview/database/db_helper.dart'; 
 
 class ApiService {
   final String baseUrl;
   static String? authToken;
   
+  final DBHelper _dbHelper = DBHelper();
+
   // Base Domain
   static const String domainUrl = 'https://scentview.alwaysdata.net';
 
@@ -19,20 +23,12 @@ class ApiService {
 
   Uri _u(String path) => Uri.parse('$baseUrl$path');
 
-  // ✅ FIX: The Smart URL Builder (تصویر کے لنک کا پکا حل)
   static String? toAbsoluteUrl(String? relativeUrl) {
     if (relativeUrl == null || relativeUrl.isEmpty) return null;
-    
-    // 1. اگر لنک پہلے سے مکمل ہے
     if (relativeUrl.startsWith('http')) return relativeUrl;
-    
-    // 2. اگر لنک ڈیٹا بیس سے "/storage/..." آ رہا ہے (جو آپ کے لاگ میں ہے)
     if (relativeUrl.startsWith('/storage')) {
        return '$domainUrl$relativeUrl'; 
     }
-    
-    // 3. اگر لنک ڈیٹا بیس سے صرف "uploads/..." آ رہا ہے
-    // تو ہمیں /storage/ خود لگانا پڑے گا
     return '$domainUrl/storage/$relativeUrl'; 
   }
 
@@ -70,10 +66,20 @@ class ApiService {
 
   // ================ CATEGORY METHODS ================
   Future<List<app_category.Category>> fetchCategories() async {
-    final res = await http.get(_u('/categories'), headers: _headers());
-    if (res.statusCode != 200) throw Exception('Failed to fetch categories');
-    final List data = jsonDecode(res.body) as List;
-    return data.map((e) => app_category.Category.fromJson(e)).toList();
+    // 1. Offline Check (Crash Fix)
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult == ConnectivityResult.none) {
+      return []; // Offline mein empty list return karo
+    }
+
+    try {
+      final res = await http.get(_u('/categories'), headers: _headers());
+      if (res.statusCode != 200) throw Exception('Failed to fetch categories');
+      final List data = jsonDecode(res.body) as List;
+      return data.map((e) => app_category.Category.fromJson(e)).toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   Future<Map<String, dynamic>> createCategory({required String name, XFile? imageFile, String? token}) async {
@@ -112,15 +118,36 @@ class ApiService {
     if (res.statusCode >= 300) throw Exception('Delete category failed');
   }
 
-  // ================ BANNER METHODS ================
+  // ================ BANNER METHODS (UPDATED FOR OFFLINE) ================
   Future<List<model.Banner>> fetchBanners() async {
-    try {
-      final res = await http.get(_u('/banners'), headers: _headers());
-      if (res.statusCode != 200) throw Exception('Failed to fetch banners: ${res.statusCode}');
-      final List data = jsonDecode(res.body) as List;
-      return data.map((e) => model.Banner.fromJson(e)).toList();
-    } catch (e) {
-      rethrow;
+    // 1. Internet Check
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    
+    if (connectivityResult == ConnectivityResult.none) {
+      // 📴 OFFLINE: Local DB se data lo
+      print("📴 No Internet. Fetching Banners from SQLite...");
+      return await _dbHelper.getBanners();
+    
+    } else {
+      // ✅ ONLINE: API se lo aur DB mein save karo
+      try {
+        final res = await http.get(_u('/banners'), headers: _headers());
+        
+        if (res.statusCode != 200) throw Exception('Failed to fetch banners: ${res.statusCode}');
+        
+        final List data = jsonDecode(res.body) as List;
+        List<model.Banner> banners = data.map((e) => model.Banner.fromJson(e)).toList();
+        
+        // Save to Database
+        await _dbHelper.insertBanners(banners);
+        print("💾 Banners saved to Local DB");
+        
+        return banners;
+      } catch (e) {
+        // Agar API error de, to Offline try karo
+        print("⚠️ API Error: $e. Trying Local DB...");
+        return await _dbHelper.getBanners();
+      }
     }
   }
 
@@ -148,7 +175,7 @@ class ApiService {
     final mimeType = lookupMimeType(imageFile.path);
     request.files.add(
       http.MultipartFile.fromBytes(
-        'image', // ✅ Correct for Banner
+        'image', 
         bytes,
         filename: imageFile.name,
         contentType: mimeType != null ? MediaType.parse(mimeType) : null,
@@ -193,7 +220,7 @@ class ApiService {
       final mimeType = lookupMimeType(imageFile.path);
       request.files.add(
         http.MultipartFile.fromBytes(
-          'image', // ✅ Correct for Banner
+          'image',
           bytes,
           filename: imageFile.name,
           contentType: mimeType != null ? MediaType.parse(mimeType) : null,
@@ -218,28 +245,84 @@ class ApiService {
     }
   }
 
-  // ================ PRODUCT METHODS ================
+  // ================ PRODUCT METHODS (OFFLINE SUPPORTED) ================
+  
   Future<List<Product>> fetchProducts({String? query}) async {
-    var path = '/products';
-    if (query != null && query.isNotEmpty) path += '?q=$query';
-    final res = await http.get(_u(path), headers: _headers());
-    if (res.statusCode != 200) throw Exception('Products ${res.statusCode}');
-    final List data = jsonDecode(res.body) as List;
-    return data.map((e) => Product.fromJson(e)).toList();
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    
+    if (connectivityResult == ConnectivityResult.none) {
+      // 📴 OFFLINE
+      print("📴 No Internet. Fetching from SQLite...");
+      return await _dbHelper.getProducts();
+    } else {
+      // ✅ ONLINE
+      try {
+        var path = '/products';
+        if (query != null && query.isNotEmpty) path += '?q=$query';
+        final res = await http.get(_u(path), headers: _headers());
+        
+        if (res.statusCode == 200) {
+          final List data = jsonDecode(res.body) as List;
+          List<Product> products = data.map((e) => Product.fromJson(e)).toList();
+          if (query == null || query.isEmpty) { 
+             await _dbHelper.insertProducts(products);
+             print("💾 Products saved to Local DB");
+          }
+          return products;
+        } else {
+          throw Exception('Products ${res.statusCode}');
+        }
+      } catch (e) {
+        print("⚠️ API Error: $e. Trying Local DB...");
+        return await _dbHelper.getProducts();
+      }
+    }
   }
 
   Future<List<Product>> fetchSliderProducts() async {
-    final res = await http.get(_u('/slider-products'), headers: _headers());
-    if (res.statusCode != 200) throw Exception('Slider products ${res.statusCode}');
-    final List data = jsonDecode(res.body) as List;
-    return data.map((e) => Product.fromJson(e)).toList();
+    // 1. Offline Check
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    
+    if (connectivityResult == ConnectivityResult.none) {
+      // 📴 OFFLINE: Local DB se 'isSlider' filter karo
+      print("📴 No Internet. Fetching Slider from SQLite...");
+      List<Product> allProducts = await _dbHelper.getProducts();
+      return allProducts.where((p) => p.isSlider).toList();
+    } else {
+      // ✅ ONLINE
+      try {
+        final res = await http.get(_u('/slider-products'), headers: _headers());
+        if (res.statusCode != 200) throw Exception('Slider products ${res.statusCode}');
+        final List data = jsonDecode(res.body) as List;
+        return data.map((e) => Product.fromJson(e)).toList();
+      } catch (e) {
+        List<Product> allProducts = await _dbHelper.getProducts();
+        return allProducts.where((p) => p.isSlider).toList();
+      }
+    }
   }
 
   Future<List<Product>> fetchFeaturedProducts() async {
-    final res = await http.get(_u('/products/featured'), headers: _headers());
-    if (res.statusCode != 200) throw Exception('Featured products ${res.statusCode}');
-    final List data = jsonDecode(res.body) as List;
-    return data.map((e) => Product.fromJson(e)).toList();
+    // 1. Offline Check
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    
+    if (connectivityResult == ConnectivityResult.none) {
+      // 📴 OFFLINE: Local DB se 'isFeatured' filter karo
+      print("📴 No Internet. Fetching Featured from SQLite...");
+      List<Product> allProducts = await _dbHelper.getProducts();
+      return allProducts.where((p) => p.isFeatured).toList();
+    } else {
+      // ✅ ONLINE
+      try {
+        final res = await http.get(_u('/products/featured'), headers: _headers());
+        if (res.statusCode != 200) throw Exception('Featured products ${res.statusCode}');
+        final List data = jsonDecode(res.body) as List;
+        return data.map((e) => Product.fromJson(e)).toList();
+      } catch (e) {
+        List<Product> allProducts = await _dbHelper.getProducts();
+        return allProducts.where((p) => p.isFeatured).toList();
+      }
+    }
   }
 
   // === PRODUCT ADD FUNCTION ===
@@ -258,7 +341,6 @@ class ApiService {
     final request = http.MultipartRequest('POST', _u('/products'));
     request.headers.addAll(_headers(token: token, multipart: true));
     
-    // Debug
     print("🚀 Adding Product: $name");
 
     request.fields.addAll({
@@ -287,7 +369,7 @@ class ApiService {
       final bytes = await imageFile.readAsBytes();
       final mimeType = lookupMimeType(imageFile.path);
       request.files.add(http.MultipartFile.fromBytes(
-        'main_image', // FIX: Match backend expectation
+        'main_image', 
         bytes, 
         filename: imageFile.name, 
         contentType: mimeType != null ? MediaType.parse(mimeType) : null
@@ -350,7 +432,7 @@ class ApiService {
       final bytes = await imageFile.readAsBytes();
       final mimeType = lookupMimeType(imageFile.path);
       request.files.add(http.MultipartFile.fromBytes(
-        'main_image', // FIX: Match backend expectation
+        'main_image', 
         bytes, 
         filename: imageFile.name, 
         contentType: mimeType != null ? MediaType.parse(mimeType) : null

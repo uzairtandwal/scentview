@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:scentview/models/product_model.dart';
+import 'package:cached_network_image/cached_network_image.dart'; // ✅ Offline Images ke liye
+import 'package:connectivity_plus/connectivity_plus.dart'; // ✅ Net Check ke liye
+import 'package:scentview/services/api_service.dart'; // ✅ URL Fix karne ke liye
 
 class ProductCard extends StatelessWidget {
   final Product product;
@@ -42,12 +45,43 @@ class ProductCard extends StatelessWidget {
     }
   }
 
+  // ✅ New Function: Click par Net Check karna
+  Future<void> _handleTap(BuildContext context) async {
+    if (isOutOfStock) return; // Agar stock nahi hai to kuch na karo
+
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult == ConnectivityResult.none) {
+      // ❌ Net nahi hai -> Message dikhao
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: const [
+              Icon(Icons.wifi_off, color: Colors.white),
+              SizedBox(width: 10),
+              Text("Please connect to internet to view details"),
+            ],
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      // ✅ Net hai -> Asal function chalao (Detail Screen)
+      onTap();
+    }
+  }
+  
+  // Helper to check stock easily
+  bool get isOutOfStock => product.stock != null && product.stock! == 0;
+
   @override
   Widget build(BuildContext context) {
     final bool onSale = product.salePrice != null && product.salePrice! > 0;
     final bool hasBadge = product.badgeText != null && product.badgeText!.isNotEmpty;
-    final bool hasImage = product.imageUrl.isNotEmpty;
-    final bool isOutOfStock = product.stock != null && product.stock! == 0;
+    // ✅ URL ko fix karein
+    final String? fullImageUrl = ApiService.toAbsoluteUrl(product.imageUrl); 
+    final bool hasImage = fullImageUrl != null && fullImageUrl.isNotEmpty;
 
     return Card(
       elevation: 4,
@@ -57,7 +91,7 @@ class ProductCard extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: isOutOfStock ? null : onTap, // Disable tap if out of stock
+        onTap: () => _handleTap(context),
         borderRadius: BorderRadius.circular(20),
         child: Stack(
           children: [
@@ -74,43 +108,34 @@ class ProductCard extends StatelessWidget {
                     ),
                     child: Stack(
                       children: [
-                        // PRODUCT IMAGE
+                        // PRODUCT IMAGE (CachedNetworkImage)
                         hasImage
-                            ? Image.network(
-                                product.imageUrl,
+                            ? CachedNetworkImage(
+                                imageUrl: fullImageUrl!,
                                 fit: BoxFit.cover,
                                 width: double.infinity,
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return Container(
-                                    color: Colors.grey.shade100,
-                                    child: Center(
-                                      child: CircularProgressIndicator(
-                                        value: loadingProgress.expectedTotalBytes != null
-                                            ? loadingProgress.cumulativeBytesLoaded /
-                                                loadingProgress.expectedTotalBytes!
-                                            : null,
-                                        strokeWidth: 2,
-                                        color: Colors.blue.shade400,
+                                placeholder: (context, url) => Container(
+                                  color: Colors.grey.shade100,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.blue.shade400,
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: Colors.grey.shade100,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.image_not_supported_outlined,
+                                        color: Colors.grey.shade400,
+                                        size: 40,
                                       ),
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey.shade100,
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.image_not_supported_outlined,
-                                          color: Colors.grey.shade400,
-                                          size: 40,
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
+                                    ],
+                                  ),
+                                ),
                               )
                             : Container(
                                 color: Colors.grey.shade100,
@@ -127,12 +152,12 @@ class ProductCard extends StatelessWidget {
                             color: Colors.black.withOpacity(0.5),
                             child: Center(
                               child: Container(
-                                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: Colors.red,
                                   borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: Text(
+                                child: const Text(
                                   'OUT OF STOCK',
                                   style: TextStyle(
                                     color: Colors.white,
@@ -149,51 +174,55 @@ class ProductCard extends StatelessWidget {
                   ),
                 ),
 
-                // ==== INFO AREA (TEXT + PRICE) ====
+                // ==== INFO AREA (FIXED FOR OVERFLOW) ====
                 Expanded(
                   flex: 3,
                   child: Container(
                     color: Colors.white,
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                    // 👇 FIX 1: Padding top 10 se 8 kar di (Jagah bachane ke liye)
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         // PRODUCT NAME
-                        Text(
-                          product.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.grey.shade900,
-                            height: 1.2,
+                        // 👇 FIX 2: Flexible lagaya taake text overflow na ho
+                        Flexible(
+                          child: Text(
+                            product.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.grey.shade900,
+                              height: 1.1, // 👇 FIX 3: Line height 1.2 se 1.1 kar di
+                            ),
                           ),
                         ),
 
-                        // PRICE ROW (IMPROVED FORMATTING)
+                        // PRICE ROW
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             if (onSale) ...[
-                              // REGULAR PRICE (STRIKETHROUGH)
+                              // REGULAR PRICE
                               Text(
                                 'Rs ${product.originalPrice.toStringAsFixed(0)}',
                                 style: TextStyle(
                                   decoration: TextDecoration.lineThrough,
                                   color: Colors.grey.shade600,
-                                  fontSize: 13,
+                                  fontSize: 12, // 👇 FIX 4: Font size 13 se 12 kar di
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              // SALE PRICE (BOLD & COLORED)
+                              const SizedBox(width: 6),
+                              // SALE PRICE
                               Text(
                                 'Rs ${product.salePrice!.toStringAsFixed(0)}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
-                                  fontSize: 18,
+                                  fontSize: 16, // 👇 FIX 5: Font size 18 se 16 kar di
                                   color: Colors.red.shade700,
                                 ),
                               ),
@@ -203,7 +232,7 @@ class ProductCard extends StatelessWidget {
                                 'Rs ${product.originalPrice.toStringAsFixed(0)}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
-                                  fontSize: 18,
+                                  fontSize: 16, // 👇 FIX 6: Font size 18 se 16 kar di
                                   color: Colors.blue.shade800,
                                 ),
                               ),
@@ -214,7 +243,7 @@ class ProductCard extends StatelessWidget {
                   ),
                 ),
 
-                // ==== STOCK STRIP (BOTTOM) - ONLY FOR LOW STOCK (1-10) ====
+                // ==== STOCK STRIP (BOTTOM) ====
                 if (product.stock != null && product.stock! > 0 && product.stock! <= 10)
                   Container(
                     height: 24,
@@ -256,8 +285,8 @@ class ProductCard extends StatelessWidget {
               ],
             ),
 
-            // ==== BADGE (BEST SELLER / NEW ARRIVAL) ====
-            if (hasBadge && !isOutOfStock) // Don't show badge if out of stock
+            // ==== BADGE ====
+            if (hasBadge && !isOutOfStock)
               Positioned(
                 top: 10,
                 left: 10,

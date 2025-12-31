@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:scentview/models/banner.dart' as model;
 import 'package:scentview/services/api_service.dart';
+import 'package:cached_network_image/cached_network_image.dart'; // ✅ Offline Images ke liye
 
 class BannerCarousel extends StatefulWidget {
   final List<model.Banner> banners;
@@ -115,6 +116,9 @@ class _BannerCarouselState extends State<BannerCarousel> {
               },
               itemBuilder: (context, index) {
                 final banner = widget.banners[index];
+                // ✅ Fix URL
+                final imageUrl = ApiService.toAbsoluteUrl(banner.imageUrl);
+
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: GestureDetector(
@@ -140,39 +144,31 @@ class _BannerCarouselState extends State<BannerCarousel> {
                           child: Stack(
                             fit: StackFit.expand,
                             children: [
-                              // Banner Image
-                              banner.imageUrl != null && banner.imageUrl!.isNotEmpty
-                                  ? Image.network(
-                                      ApiService.toAbsoluteUrl(banner.imageUrl)!,
+                              // ✅ Banner Image (CachedNetworkImage)
+                              (imageUrl != null && imageUrl.isNotEmpty)
+                                  ? CachedNetworkImage(
+                                      imageUrl: imageUrl,
                                       fit: BoxFit.cover,
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
-                                        return Container(
-                                          color: Colors.grey.shade100,
-                                          child: Center(
-                                            child: CircularProgressIndicator(
-                                              value: loadingProgress.expectedTotalBytes != null
-                                                  ? loadingProgress.cumulativeBytesLoaded /
-                                                      loadingProgress.expectedTotalBytes!
-                                                  : null,
-                                              strokeWidth: 2,
-                                              color: Colors.blue.shade300,
-                                            ),
+                                      placeholder: (context, url) => Container(
+                                        color: Colors.grey.shade100,
+                                        child: Center(
+                                          child: CircularProgressIndicator(
+                                            value: null,
+                                            strokeWidth: 2,
+                                            color: Colors.blue.shade300,
                                           ),
-                                        );
-                                      },
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          color: Colors.grey.shade200,
-                                          child: const Center(
-                                            child: Icon(
-                                              Icons.image_not_supported_outlined,
-                                              color: Colors.grey,
-                                              size: 40,
-                                            ),
+                                        ),
+                                      ),
+                                      errorWidget: (context, url, error) => Container(
+                                        color: Colors.grey.shade200,
+                                        child: const Center(
+                                          child: Icon(
+                                            Icons.image_not_supported_outlined,
+                                            color: Colors.grey,
+                                            size: 40,
                                           ),
-                                        );
-                                      },
+                                        ),
+                                      ),
                                     )
                                   : Container(
                                       color: Colors.grey.shade200,
@@ -212,7 +208,6 @@ class _BannerCarouselState extends State<BannerCarousel> {
           ),
         ),
 
-        
         const SizedBox(height: 12),
         
         // ================ INDICATORS ================
