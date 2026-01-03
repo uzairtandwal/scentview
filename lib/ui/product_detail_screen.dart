@@ -5,6 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:scentview/services/cart_service.dart';
+import 'package:scentview/services/auth_service.dart'; // ✅ Auth Service Import
+import 'login_screen.dart'; // ✅ Login Screen Import
 
 class ProductDetailScreen extends StatefulWidget {
   static const routeName = '/product-detail';
@@ -33,6 +35,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _imageUrls = [widget.product.imageUrl];
   }
 
+  // ✅ Auth Check Helper: Ye function check karega login hai ya nahi
+  bool _ensureAuthenticated() {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    if (!authService.isAuthenticated) {
+      // Agar guest hai to Login Screen par bhej do
+      Navigator.of(context).pushNamed(LoginScreen.routeName).then((_) {
+        // Login ho kar wapis aane par UI refresh karne ke liye
+        setState(() {});
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to continue with your purchase'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return false;
+    }
+    return true;
+  }
+
   void _openWhatsApp() async {
     const phoneNumber = "+923079417399";
     const message = "Hello, I'm interested in your products.";
@@ -44,7 +67,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Could not open WhatsApp'),
+            content: const Text('Could not open WhatsApp'),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -54,7 +77,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Error opening WhatsApp'),
           behavior: SnackBarBehavior.floating,
         ),
@@ -63,6 +86,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _addToCart() {
+    // ✅ Change: Check if user is logged in
+    if (!_ensureAuthenticated()) return;
+
     final cartService = Provider.of<CartService>(context, listen: false);
     cartService.updateQuantity(widget.product, _quantity);
     
@@ -86,6 +112,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _buyNow() {
+    // ✅ Change: Check if user is logged in
+    if (!_ensureAuthenticated()) return;
+
     _addToCart();
     Navigator.pushNamed(context, '/checkout');
   }
@@ -93,7 +122,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void _shareProduct() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Share functionality coming soon!'),
+        content: const Text('Share functionality coming soon!'),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -117,7 +146,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           widget.product.name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
+          style: const TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 18,
           ),
@@ -218,7 +247,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       child: Container(
                                         width: 60,
                                         height: 60,
-                                        decoration: BoxDecoration(
+                                        decoration: const BoxDecoration(
                                           color: Colors.white,
                                           shape: BoxShape.circle,
                                         ),
@@ -362,7 +391,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.local_offer_outlined,
                                 color: Colors.white,
                                 size: 16,
@@ -370,7 +399,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               const SizedBox(width: 8),
                               Text(
                                 'SALE ${discountPercent.toStringAsFixed(0)}% OFF',
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
@@ -412,10 +441,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
                             ],
                           ),
-                          Spacer(),
+                          const Spacer(),
                           if (onSale)
                             Container(
-                              padding: EdgeInsets.symmetric(
+                              padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 8,
                               ),
@@ -434,7 +463,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     size: 18,
                                     color: Colors.green.shade700,
                                   ),
-                                  SizedBox(width: 6),
+                                  const SizedBox(width: 6),
                                   Text(
                                     'Save \$${(widget.product.originalPrice - widget.product.salePrice!).toStringAsFixed(2)}',
                                     style: TextStyle(
@@ -480,7 +509,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     color: Colors.grey.shade700,
                                   ),
                                 ),
-                                SizedBox(height: 4),
+                                const SizedBox(height: 4),
                                 Text(
                                   'Select how many you want',
                                   style: TextStyle(
@@ -687,7 +716,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     offset: const Offset(0, -5),
                   ),
                 ],
-                borderRadius: BorderRadius.only(
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(24),
                   topRight: Radius.circular(24),
                 ),
@@ -711,7 +740,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           elevation: 0,
                           shadowColor: Colors.transparent,
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.shopping_cart_outlined, size: 22),
@@ -745,7 +774,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           elevation: 0,
                           shadowColor: Colors.transparent,
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.bolt_rounded, size: 22),
@@ -774,7 +803,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget _buildDetailRow(IconData icon, String title, String value, 
       {bool isStock = false}) {
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
@@ -800,7 +829,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -812,14 +841,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     color: Colors.grey.shade600,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   value,
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: isStock && widget.product.stock != null && 
-                           widget.product.stock! > 0
+                            widget.product.stock! > 0
                         ? Colors.green.shade700
                         : Colors.grey.shade900,
                   ),
@@ -849,7 +878,7 @@ class _RelatedProductsSection extends StatelessWidget {
     }).toList();
 
     if (relatedProducts.isEmpty) {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
 
     return Column(
@@ -863,7 +892,7 @@ class _RelatedProductsSection extends StatelessWidget {
             color: Colors.grey.shade900,
           ),
         ),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
           "Similar fragrances you may enjoy",
           style: TextStyle(
@@ -871,13 +900,13 @@ class _RelatedProductsSection extends StatelessWidget {
             color: Colors.grey.shade600,
           ),
         ),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         SizedBox(
           height: 280,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: relatedProducts.length,
-            separatorBuilder: (context, index) => SizedBox(width: 20),
+            separatorBuilder: (context, index) => const SizedBox(width: 20),
             itemBuilder: (context, index) {
               final relatedProduct = relatedProducts[index];
               return SizedBox(

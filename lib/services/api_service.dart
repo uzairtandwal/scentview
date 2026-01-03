@@ -32,19 +32,29 @@ class ApiService {
     return '$domainUrl/storage/$relativeUrl'; 
   }
 
-  Map<String, String> _headers({bool json = false, bool multipart = false, String? token}) {
-    final h = <String, String>{};
-    h['Accept'] = 'application/json';
-    if (!multipart) {
-      if (json) h['Content-Type'] = 'application/json';
-    }
+ Map<String, String> _headers({bool json = false, bool multipart = false, String? token}) {
+  final h = <String, String>{};
+  h['Accept'] = 'application/json';
+  
+  // ✅ Ye headers mobile connectivity ke liye zaroori hain
+  h['Connection'] = 'Keep-Alive'; 
 
-    final effectiveToken = token ?? ApiService.authToken;
-    if (effectiveToken != null && effectiveToken.isNotEmpty) {
-      h['Authorization'] = 'Bearer $effectiveToken';
-    }
-    return h;
+  if (!multipart) {
+    if (json) h['Content-Type'] = 'application/json';
   }
+
+  // Pehle check karo ke method mein token bheja gaya hai ya nahi
+  // Phir static variable check karo
+  final effectiveToken = token ?? ApiService.authToken;
+  
+  if (effectiveToken != null && effectiveToken.isNotEmpty) {
+    h['Authorization'] = 'Bearer $effectiveToken';
+    print("🔑 Token used in Request: $effectiveToken"); // Debugging ke liye
+  } else {
+    print("⚠️ No Token found for request!"); 
+  }
+  return h;
+}
 
   String _parseError(int statusCode, String responseBody) {
     try {

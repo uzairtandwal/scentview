@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import 'registration_screen.dart';
 import 'widgets/feedback_dialog.dart';
+import '../admin/admin_home_screen.dart'; // ✅ Admin Home import kiya
 
 class LoginScreen extends StatefulWidget {
   static const routeName = '/login';
@@ -31,6 +32,8 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     final authService = Provider.of<AuthService>(context, listen: false);
+    
+    // Login API call
     final error = await authService.signInWithEmailAndPassword(
       _emailController.text.trim(),
       _passwordController.text.trim(),
@@ -50,12 +53,38 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _isLoading = false;
       });
+
+      // ✅ SUCCESS LOGIC START
+      // Pehle success dialog dikhao
       await showFeedbackDialog(
         context,
         title: 'Welcome back!',
         message: 'You have logged in successfully.',
         type: FeedbackType.success,
       );
+
+      if (mounted) {
+        // 1. Check karo ke login karne wala ADMIN hai ya nahi
+        final isAdmin = await authService.isAdmin();
+        
+        if (isAdmin) {
+          // 👑 Agar Admin hai to Dashboard par bhej do aur pichle saare raste khatam kar do
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            AdminHomeScreen.routeName,
+            (route) => false,
+          );
+        } else {
+          // 👤 Agar User hai:
+          // Check karo ke kya user ko "Buy Now" daba kar yahan bheja gaya tha?
+          // Agar haan, to Navigator.pop() use karein taake wo product page par wapis chala jaye.
+          // Agar wo normal login karne aaya tha, to usay home par bhej dein.
+          if (Navigator.canPop(context)) {
+            Navigator.of(context).pop(); 
+          } else {
+            Navigator.of(context).pushReplacementNamed('/'); 
+          }
+        }
+      }
     }
   }
 

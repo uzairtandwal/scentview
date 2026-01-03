@@ -56,6 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _api.fetchProducts(),
       ]);
 
+      if (!mounted) return;
       setState(() {
         _categories = results[0] as List<Category>;
         _featuredProducts = results[1] as List<Product>;
@@ -69,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _showSalePopupIfNeeded();
 
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _hasError = true;
         _errorMessage = e.toString();

@@ -25,10 +25,11 @@ class AuthUser {
   });
 }
 
-class AuthService {
+// ✅ Is class ko ChangeNotifier banaya hai taake UI ko pata chal sake login hua ya nahi
+class AuthService extends ChangeNotifier {
   final _controller = StreamController<AuthUser?>.broadcast();
   AuthUser? _current;
-  final String _baseUrl = 'http://scentview.alwaysdata.net';
+ final String _baseUrl = 'https://scentview.alwaysdata.net';
 
   AuthService() {
     _bootstrap();
@@ -37,32 +38,55 @@ class AuthService {
   Stream<AuthUser?> get user => _controller.stream;
   AuthUser? get currentUser => _current;
 
+  // ✅ New Getter: Check karne ke liye ke user login hai ya guest
+  bool get isAuthenticated => _current != null;
+
   Future<void> _bootstrap() async {
+    await tryAutoLogin();
+  }
+
+  // ✅ New Function: Jo app khulte hi purana token check karega
+  // Iska maqsad app.dart ki logic ko support karna hai
+  Future<bool> tryAutoLogin() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
-    if (token != null && token.isNotEmpty) {
-      ApiService.authToken = token;
-      try {
-        final res = await http.get(
-          Uri.parse('$_baseUrl/api/me'),
-          headers: {'Authorization': 'Bearer $token'},
-        );
-        if (res.statusCode == 200) {
-          final data = jsonDecode(res.body) as Map<String, dynamic>;
-          _current = AuthUser(
-            name: data['name'] ?? '',
-            email: data['email'] ?? '',
-            role: data['role'] ?? 'user',
-            photoUrl: data['photo_url'],
-            createdAt: data['created_at'] != null ? DateTime.parse(data['created_at']) : null,
-            phoneNumber: data['phone_number'],
-            address: data['address'],
-          );
-          _controller.add(_current);
-        }
-      } catch (_) {}
-    } else {
+    
+    if (token == null || token.isEmpty) {
       _controller.add(null);
+      return false;
+    }
+
+    ApiService.authToken = token;
+    try {
+      final res = await http.get(
+        Uri.parse('$_baseUrl/api/me'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        _current = AuthUser(
+          name: data['name'] ?? '',
+          email: data['email'] ?? '',
+          role: data['role'] ?? 'user',
+          photoUrl: data['photo_url'],
+          createdAt: data['created_at'] != null ? DateTime.parse(data['created_at']) : null,
+          phoneNumber: data['phone_number'],
+          address: data['address'],
+        );
+        _controller.add(_current);
+        notifyListeners(); // UI update karne ke liye
+        return true;
+      } else {
+        // Agar token expire ho gaya ho
+        ApiService.authToken = null;
+        _controller.add(null);
+        return false;
+      }
+    } catch (e) {
+      if (kDebugMode) print('Auto-Login Error: $e');
+      _controller.add(null);
+      return false;
     }
   }
 
@@ -77,16 +101,21 @@ class AuthService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
+      
       if (res.statusCode >= 300) {
         return 'Incorrect email or password. Please try again.';
       }
+      
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final token = data['token'] as String?;
       final user = data['user'] as Map<String, dynamic>?;
+      
       if (token == null || user == null) return 'Invalid server response.';
+      
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
       ApiService.authToken = token;
+      
       _current = AuthUser(
         name: user['name'] ?? '',
         email: user['email'] ?? '',
@@ -96,12 +125,12 @@ class AuthService {
         phoneNumber: user['phone_number'],
         address: user['address'],
       );
+      
       _controller.add(_current);
+      notifyListeners(); // ✅ UI ko notify karega ke login ho gaya
       return null;
     } catch (e) {
-      if (kDebugMode) {
-        print('API Sign-In Error: $e');
-      }
+      if (kDebugMode) print('API Sign-In Error: $e');
       return 'An unexpected error occurred.';
     }
   }
@@ -118,16 +147,21 @@ class AuthService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'name': name, 'email': email, 'password': password}),
       );
+      
       if (res.statusCode >= 300) {
         return 'Registration failed. Email may already be in use.';
       }
+      
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final token = data['token'] as String?;
       final user = data['user'] as Map<String, dynamic>?;
+      
       if (token == null || user == null) return 'Invalid server response.';
+      
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
       ApiService.authToken = token;
+      
       _current = AuthUser(
         name: user['name'] ?? '',
         email: user['email'] ?? '',
@@ -137,12 +171,12 @@ class AuthService {
         phoneNumber: user['phone_number'],
         address: user['address'],
       );
+      
       _controller.add(_current);
+      notifyListeners();
       return null;
     } catch (e) {
-      if (kDebugMode) {
-        print('API Registration Error: $e');
-      }
+      if (kDebugMode) print('API Registration Error: $e');
       return 'An unexpected error occurred.';
     }
   }
@@ -157,11 +191,13 @@ class AuthService {
         );
       }
     } catch (_) {}
+    
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     ApiService.authToken = null;
     _current = null;
     _controller.add(null);
+    notifyListeners(); // ✅ UI ko notify karega ke logout ho gaya
   }
 
   Future<bool> isAdmin() async {
@@ -174,5 +210,6 @@ class AuthService {
 
   void dispose() {
     _controller.close();
+    super.dispose();
   }
 }
