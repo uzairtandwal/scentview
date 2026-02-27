@@ -3,15 +3,13 @@ import 'package:provider/provider.dart';
 import 'package:scentview/admin/admin_layout.dart';
 import 'package:scentview/services/api_service.dart';
 import 'package:scentview/services/orders_service.dart';
-import 'package:scentview/services/auth_service.dart'; // ✅ Added for Logout
+import 'package:scentview/services/auth_service.dart';
 import 'package:scentview/models/product_model.dart';
 import 'package:scentview/models/category.dart' as app_category;
 
-// ================ CORRECT IMPORTS ================ 
 import 'package:scentview/admin/product_list_screen.dart';
 import 'package:scentview/admin/categories_screen.dart';
 import 'package:scentview/admin/product_form_screen.dart';
-import 'package:scentview/admin/banners_screen.dart';
 import 'package:scentview/admin/add_edit_banner_screen.dart';
 import 'package:scentview/admin/add_edit_category_screen.dart';
 
@@ -28,6 +26,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   late Future<List<Product>> _productsFuture;
   late Future<List<app_category.Category>> _categoriesFuture;
 
+  static const Color _bg       = Color(0xFFF7F8FC);
+  static const Color _white    = Colors.white;
+  static const Color _primary  = Color(0xFFFF6B9D);
+  static const Color _textDark = Color(0xFF1A1D2E);
+  static const Color _textSub  = Color(0xFF9094A6);
+
+  // ── Dummy Orders (jab tak real DB na aaye) ─────────────────────
+  final List<Map<String, dynamic>> _dummyOrders = [
+    {'id': '#1001', 'user': 'Ahmed Khan',    'product': 'Rose Perfume',   'rate': '\$45.00', 'address': 'Lahore, Punjab',   'status': 'Pending'},
+    {'id': '#1002', 'user': 'Sara Ali',      'product': 'Oud Musk',       'rate': '\$78.00', 'address': 'Karachi, Sindh',   'status': 'Completed'},
+    {'id': '#1003', 'user': 'Bilal Raza',    'product': 'Jasmine Essence','rate': '\$32.00', 'address': 'Islamabad',        'status': 'Pending'},
+    {'id': '#1004', 'user': 'Hina Shafiq',   'product': 'Amber Wood',     'rate': '\$95.00', 'address': 'Faisalabad',       'status': 'Cancelled'},
+    {'id': '#1005', 'user': 'Usman Tariq',   'product': 'Blue Ocean',     'rate': '\$55.00', 'address': 'Multan, Punjab',   'status': 'Completed'},
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -36,205 +49,140 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   void _loadData() {
     setState(() {
-      _productsFuture = _apiService.fetchProducts();
+      _productsFuture   = _apiService.fetchProducts();
       _categoriesFuture = _apiService.fetchCategories();
       Provider.of<OrdersService>(context, listen: false).fetchOrders();
     });
   }
 
-  // ✅ New Method: Admin se User side switch karne ke liye
   void _logoutAndVisitShop(BuildContext context) async {
     final authService = Provider.of<AuthService>(context, listen: false);
-    
-    // 1. Admin session clear karein
     await authService.signOut();
-    
-    // 2. Fresh redirect to home logic (App automatically normal user side dikhayegi)
     if (mounted) {
       Navigator.of(context).pushNamedAndRemoveUntil('/home-logic', (route) => false);
-      
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Switched to Shop View (User Mode)'),
-          backgroundColor: Colors.pinkAccent,
-        ),
+        const SnackBar(content: Text('Switched to Shop View'), backgroundColor: Color(0xFFFF6B9D)),
       );
     }
-  }
-
-  // ================ NAVIGATION METHODS ================ 
-  void _navigateToProducts(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const ProductListScreen()));
-  }
-
-  void _navigateToCategories(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const CategoriesScreen()));
-  }
-
-  void _navigateToAddProduct(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const ProductFormScreen()));
-  }
-
-  void _navigateToBanners(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const BannersScreen()));
-  }
-
-  void _navigateToAddBanner(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const AddEditBannerScreen()));
-  }
-
-  void _navigateToAddCategory(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const AddEditCategoryScreen()));
   }
 
   void _showComingSoon(BuildContext context, String feature) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Coming Soon'),
-        content: Text('$feature feature is coming soon!'),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+        content: Text('$feature jald aa raha hai!'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK', style: TextStyle(color: Color(0xFFFF6B9D))))],
       ),
     );
   }
 
+  void _nav(BuildContext context, Widget screen) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+
   @override
   Widget build(BuildContext context) {
     return Consumer<OrdersService>(
-      builder: (context, ordersService, child) {
-        
-        final List<Map<String, dynamic>> stats = [
-          {
-            'title': 'Total Products', 
-            'future': _productsFuture, 
-            'icon': Icons.shopping_bag_rounded, 
-            'color': Colors.blue,
-            'onTap': () => _navigateToProducts(context),
-          },
-          {
-            'title': 'Total Categories', 
-            'future': _categoriesFuture, 
-            'icon': Icons.category_rounded, 
-            'color': Colors.green,
-            'onTap': () => _navigateToCategories(context),
-          },
-          {
-            'title': 'Total Orders', 
-            'value': ordersService.orders.length.toString(), 
-            'icon': Icons.receipt_long_rounded, 
-            'color': Colors.orange,
-            'onTap': () => _showComingSoon(context, 'Orders Management'),
-          },
-          {
-            'title': 'Revenue', 
-            'value': '\$${ordersService.orders.fold<double>(0, (sum, item) => sum + item.total).toStringAsFixed(2)}', 
-            'icon': Icons.attach_money_rounded, 
-            'color': Colors.green,
-            'onTap': () => _showComingSoon(context, 'Revenue Reports'),
-          },
-          {
-            'title': 'Pending Orders', 
-            'value': ordersService.orders.where((o) => o.status.toLowerCase() == 'pending').length.toString(), 
-            'icon': Icons.pending_actions_rounded, 
-            'color': Colors.red,
-            'onTap': () => _showComingSoon(context, 'Pending Orders'),
-          },
+      builder: (context, ordersService, _) {
+
+        // ── Stats ──────────────────────────────────────────────────
+        final stats = [
+          _StatItem(title: 'Products',   future: _productsFuture,   icon: Icons.shopping_bag_rounded,   iconBg: const Color(0xFFE8F0FE), iconColor: const Color(0xFF4A6CF7), onTap: () => _nav(context, const ProductListScreen())),
+          _StatItem(title: 'Categories', future: _categoriesFuture, icon: Icons.category_rounded,        iconBg: const Color(0xFFE6F9F0), iconColor: const Color(0xFF27AE60), onTap: () => _nav(context, const CategoriesScreen())),
+          _StatItem(title: 'Orders',     value: ordersService.orders.isEmpty ? _dummyOrders.length.toString() : ordersService.orders.length.toString(), icon: Icons.receipt_long_rounded,    iconBg: const Color(0xFFFFF3E0), iconColor: const Color(0xFFF39C12), onTap: () => _showComingSoon(context, 'Orders Management')),
+          _StatItem(title: 'Revenue',    value: '\$${ordersService.orders.fold<double>(0, (s, o) => s + o.total).toStringAsFixed(0)}', icon: Icons.attach_money_rounded,    iconBg: const Color(0xFFFCE4EC), iconColor: _primary, onTap: () => _showComingSoon(context, 'Revenue Reports')),
+          _StatItem(title: 'Pending',    value: ordersService.orders.where((o) => o.status.toLowerCase() == 'pending').length.toString(), icon: Icons.pending_actions_rounded, iconBg: const Color(0xFFFDEDED), iconColor: const Color(0xFFE74C3C), onTap: () => _showComingSoon(context, 'Pending Orders')),
         ];
 
-        final List<Map<String, dynamic>> quickActions = [
-          {'title': 'Add Product', 'icon': Icons.add_circle_outline_rounded, 'onTap': () => _navigateToAddProduct(context)},
-          {'title': 'Manage Categories', 'icon': Icons.edit_note_rounded, 'onTap': () => _navigateToCategories(context)},
-          {'title': 'Upload Banner', 'icon': Icons.image_outlined, 'onTap': () => _navigateToAddBanner(context)},
-          {'title': 'View Reports', 'icon': Icons.analytics_outlined, 'onTap': () => _showComingSoon(context, 'Analytics Reports')},
+        // ── Quick Actions (4 items — 2x2 grid) ─────────────────────
+        final actions = [
+          _ActionItem(title: 'Add Product',   subtitle: 'Naya product',  icon: Icons.add_box_rounded,            color: const Color(0xFF4A6CF7), onTap: () => _nav(context, const ProductFormScreen())),
+          _ActionItem(title: 'Categories',    subtitle: 'Manage karein', icon: Icons.folder_special_rounded,     color: const Color(0xFF27AE60), onTap: () => _nav(context, const CategoriesScreen())),
+          _ActionItem(title: 'Add Banner',    subtitle: 'Upload karein', icon: Icons.add_photo_alternate_rounded,color: _primary,                onTap: () => _nav(context, const AddEditBannerScreen())),
+          _ActionItem(title: 'Reports',       subtitle: 'Analytics',     icon: Icons.bar_chart_rounded,          color: const Color(0xFFF39C12), onTap: () => _showComingSoon(context, 'Analytics Reports')),
         ];
 
         return Scaffold(
-          // ✅ AppBar with Visit Shop & Logout buttons
+          backgroundColor: _bg,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: _white,
             elevation: 0,
             centerTitle: false,
-            title: const Text('Admin Dashboard', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            title: const Text('Dashboard', style: TextStyle(color: Color(0xFF1A1D2E), fontWeight: FontWeight.w800, fontSize: 20)),
             actions: [
               TextButton.icon(
                 onPressed: () => _logoutAndVisitShop(context),
-                icon: const Icon(Icons.shopping_basket_outlined, color: Colors.pinkAccent),
-                label: const Text('Visit Shop', style: TextStyle(color: Colors.pinkAccent, fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.storefront_outlined, color: Color(0xFFFF6B9D), size: 18),
+                label: const Text('Shop', style: TextStyle(color: Color(0xFFFF6B9D), fontWeight: FontWeight.w700)),
               ),
-              IconButton(
-                icon: const Icon(Icons.logout_rounded, color: Colors.grey),
-                onPressed: () => _logoutAndVisitShop(context),
-                tooltip: 'Logout',
-              ),
-              const SizedBox(width: 8),
+              IconButton(icon: const Icon(Icons.logout_rounded, color: Color(0xFF9094A6)), onPressed: () => _logoutAndVisitShop(context), tooltip: 'Logout'),
+              const SizedBox(width: 6),
             ],
           ),
           body: AdminLayout(
             child: RefreshIndicator(
+              color: _primary,
               onRefresh: () async => _loadData(),
               child: CustomScrollView(
                 slivers: [
-                  // Header
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Welcome back, Admin!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 4),
-                          Text('Here\'s what\'s happening today', style: TextStyle(fontSize: 15, color: Colors.grey.shade600)),
-                        ],
-                      ),
-                    ),
-                  ),
 
-                  // Stats Grid
+                  // ── Welcome Banner ───────────────────────────────
+                  SliverToBoxAdapter(child: _buildHeader()),
+
+                  // ── Stats Grid ───────────────────────────────────
                   SliverPadding(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                     sliver: SliverGrid(
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 1.4,
+                        // FIX 1: childAspectRatio badha diya — overflow band
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 14,
+                        mainAxisSpacing: 14,
+                        childAspectRatio: 1.35,
                       ),
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        final stat = stats[index];
-                        if (stat.containsKey('future')) {
-                          return FutureBuilder<List<dynamic>>(
-                            future: stat['future'],
-                            builder: (context, snapshot) => _buildStatCard(context, title: stat['title'], value: snapshot.hasData ? snapshot.data!.length.toString() : '...', icon: stat['icon'], color: stat['color'], isLoading: snapshot.connectionState == ConnectionState.waiting, onTap: stat['onTap']),
-                          );
-                        }
-                        return _buildStatCard(context, title: stat['title'], value: stat['value'], icon: stat['icon'], color: stat['color'], isLoading: false, onTap: stat['onTap']);
-                      }, childCount: stats.length),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) => _buildStatCard(stats[i]),
+                        childCount: stats.length,
+                      ),
                     ),
                   ),
 
-                  // Quick Actions
+                  // ── Quick Actions Title ──────────────────────────
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Text('Quick Actions', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                      child: const Text('Quick Actions', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1A1D2E))),
                     ),
                   ),
+
+                  // FIX 2: Quick Actions — 2x2 Grid (2 cards per row)
                   SliverPadding(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
                     sliver: SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.2),
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        final action = quickActions[index];
-                        return _buildQuickActionCard(context, title: action['title'], icon: action['icon'], onTap: action['onTap']);
-                      }, childCount: quickActions.length),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 14,
+                        mainAxisSpacing: 14,
+                        childAspectRatio: 1.6,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) => _buildActionCard(actions[i]),
+                        childCount: actions.length,
+                      ),
                     ),
                   ),
 
-                  // Recent Activity
+                  // ── Recent Orders Title ──────────────────────────
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      child: Text('Recent Orders', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                      child: const Text('Recent Orders', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1A1D2E))),
                     ),
                   ),
-                  _buildRecentOrdersList(context, ordersService),
+
+                  // FIX 3: Proper Table for Orders
+                  SliverToBoxAdapter(child: _buildOrdersTable()),
 
                   const SliverToBoxAdapter(child: SizedBox(height: 40)),
                 ],
@@ -246,65 +194,212 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  // ================ ALL WIDGET HELPERS ================
-
-  Widget _buildRecentOrdersList(BuildContext context, OrdersService ordersService) {
-    if (ordersService.orders.isEmpty) {
-      return const SliverToBoxAdapter(child: Center(child: Padding(
-        padding: EdgeInsets.all(20.0),
-        child: Text('No orders yet.'),
-      )));
-    }
-    return SliverList(
-      delegate: SliverChildBuilderDelegate((context, index) {
-        final order = ordersService.orders[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
-          child: ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.shopping_bag)),
-            title: Text('Order #${order.id}'),
-            subtitle: Text('\$${order.total.toStringAsFixed(2)} - ${order.status}'),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-            onTap: () => _showComingSoon(context, 'Order Management'),
+  // ─── Welcome Banner ────────────────────────────────────────────
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFFFF6B9D), Color(0xFFFF8FAB)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Welcome back! 👋', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 4),
+                const Text('Admin Dashboard', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                Text('Aaj ka overview neeche dekhein', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
+              ],
+            ),
           ),
-        );
-      }, childCount: ordersService.orders.length > 5 ? 5 : ordersService.orders.length),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(14)),
+            child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 32),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildStatCard(BuildContext context, {required String title, required String value, required IconData icon, required Color color, required bool isLoading, required VoidCallback onTap}) {
+  // ─── Stat Card (FIX 1: overflow band kiya) ────────────────────
+  Widget _buildStatCard(_StatItem stat) {
+    Widget valueWidget = stat.future != null
+        ? FutureBuilder<List<dynamic>>(
+            future: stat.future,
+            builder: (_, snap) => Text(
+              snap.hasData ? snap.data!.length.toString() : (snap.hasError ? '–' : '...'),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1A1D2E)),
+              overflow: TextOverflow.ellipsis,
+            ),
+          )
+        : Text(
+            stat.value ?? '0',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1A1D2E)),
+            overflow: TextOverflow.ellipsis,
+          );
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: stat.onTap,
       child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: color, size: 28),
-            Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            Text(title, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+            // Icon badge
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(color: stat.iconBg, borderRadius: BorderRadius.circular(10)),
+              child: Icon(stat.icon, color: stat.iconColor, size: 18),
+            ),
+            // Value + title — flex se overflow nahi hoga
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                valueWidget,
+                const SizedBox(height: 2),
+                Text(
+                  stat.title,
+                  style: const TextStyle(color: Color(0xFF9094A6), fontSize: 11),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildQuickActionCard(BuildContext context, {required String title, required IconData icon, required VoidCallback onTap}) {
+  // ─── Quick Action Card (FIX 2: 2x2 grid style) ────────────────
+  Widget _buildActionCard(_ActionItem action) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: action.onTap,
       child: Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
+        child: Row(
           children: [
-            Icon(icon, color: Theme.of(context).primaryColor),
-            const SizedBox(height: 8),
-            Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+            // Icon
+            Container(
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(color: action.color.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+              child: Icon(action.icon, color: action.color, size: 22),
+            ),
+            const SizedBox(width: 12),
+            // Text
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(action.title,   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A1D2E)), overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text(action.subtitle,style: const TextStyle(fontSize: 11, color: Color(0xFF9094A6)),                              overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
+
+  // ─── Orders Table (FIX 3: proper table) ───────────────────────
+  Widget _buildOrdersTable() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: _white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            headingRowColor: MaterialStateProperty.all(const Color(0xFFF7F8FC)),
+            headingTextStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF9094A6)),
+            dataTextStyle: const TextStyle(fontSize: 12, color: Color(0xFF1A1D2E)),
+            columnSpacing: 20,
+            horizontalMargin: 16,
+            dividerThickness: 0.8,
+            columns: const [
+              DataColumn(label: Text('Order ID')),
+              DataColumn(label: Text('User')),
+              DataColumn(label: Text('Product')),
+              DataColumn(label: Text('Rate')),
+              DataColumn(label: Text('Address')),
+              DataColumn(label: Text('Status')),
+            ],
+            rows: _dummyOrders.map((order) {
+              final status = order['status'] as String;
+              final statusColor = status == 'Completed'
+                  ? const Color(0xFF27AE60)
+                  : status == 'Pending'
+                      ? const Color(0xFFF39C12)
+                      : const Color(0xFFE74C3C);
+
+              return DataRow(cells: [
+                DataCell(Text(order['id'],      style: const TextStyle(fontWeight: FontWeight.w600))),
+                DataCell(Text(order['user'])),
+                DataCell(Text(order['product'])),
+                DataCell(Text(order['rate'],    style: const TextStyle(fontWeight: FontWeight.w600))),
+                DataCell(Text(order['address'])),
+                DataCell(
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(status, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ]);
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Data Models ──────────────────────────────────────────────────
+class _StatItem {
+  final String title;
+  final String? value;
+  final Future<List<dynamic>>? future;
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+  final VoidCallback onTap;
+  _StatItem({required this.title, this.value, this.future, required this.icon, required this.iconBg, required this.iconColor, required this.onTap});
+}
+
+class _ActionItem {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  _ActionItem({required this.title, required this.subtitle, required this.icon, required this.color, required this.onTap});
 }

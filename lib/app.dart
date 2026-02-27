@@ -14,7 +14,9 @@ import 'package:scentview/ui/mode_selection_screen.dart';
 import 'package:scentview/ui/product_detail_screen.dart';
 import 'package:scentview/ui/checkout_screen.dart';
 import 'package:scentview/ui/login_screen.dart';
+import 'package:scentview/ui/registration_screen.dart';
 import 'package:scentview/ui/splash_screen.dart'; // ✅ Splash Screen Import
+import 'package:scentview/ui/search_results_screen.dart'; // ✅ Search Results
 
 class ScentViewApp extends StatelessWidget {
   const ScentViewApp({super.key});
@@ -35,45 +37,51 @@ class ScentViewApp extends StatelessWidget {
           visualDensity: VisualDensity.adaptivePlatformDensity,
           useMaterial3: true,
         ),
-        
-        // 👇 Pehle Splash Screen khulegi
-        home: const SplashScreen(), 
 
+   // app.dart mein home: ko is se replace karein
+home: Builder(
+  builder: (context) => ScentViewNeonSplash(
+    onFinished: () {
+      // Ab ye context Navigator ko dhoond lega
+      Navigator.of(context).pushReplacementNamed('/home-logic');
+    },
+  ),
+),
+        // ── Aapki existing routes — bilkul same ──
         routes: {
           '/home-logic': (context) => Consumer<AuthService>(
-            builder: (context, auth, _) {
-              return FutureBuilder(
-                future: auth.tryAutoLogin(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Scaffold(body: Center(child: CircularProgressIndicator()));
-                  }
-
-                  // ✅ Agar Admin hai to Admin Dashboard
-                  if (auth.isAuthenticated && auth.currentUser?.role == 'admin') {
-                    return const AdminHomeScreen();
-                  }
-
-                  // ✅ Normal users ke liye seedha Shop (MainAppScreen) khulegi
-                  return const MainAppScreen();
+                builder: (context, auth, _) {
+                  return FutureBuilder(
+                    future: auth.tryAutoLogin(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Scaffold(
+                            body: Center(
+                                child: CircularProgressIndicator()));
+                      }
+                      if (auth.isAuthenticated &&
+                          auth.currentUser?.role == 'admin') {
+                        return const AdminHomeScreen();
+                      }
+                      return const MainAppScreen();
+                    },
+                  );
                 },
-              );
-            },
-          ),
+              ),
           MainAppScreen.routeName: (context) => const MainAppScreen(),
           AdminHomeScreen.routeName: (context) => const AdminHomeScreen(),
           CartScreen.routeName: (context) => const CartScreen(),
           CheckoutScreen.routeName: (context) => const CheckoutScreen(),
           LoginScreen.routeName: (context) => const LoginScreen(),
-          
-          // ✅ Error Fix: Direct string path use kiya hai
-          '/mode-selection': (context) => const ModeSelectionScreen(), 
-
+          RegistrationScreen.routeName: (context) =>
+              const RegistrationScreen(),
+          '/mode-selection': (context) => const ModeSelectionScreen(),
           '/admin/banners': (context) => const BannersScreen(),
           '/admin/categories': (context) => const CategoriesScreen(),
           '/admin/products': (context) => const ProductsScreen(),
         },
-        
+
         onGenerateRoute: (settings) {
           if (settings.name == ProductDetailScreen.routeName) {
             final args = settings.arguments as Map<String, dynamic>;
@@ -88,6 +96,15 @@ class ScentViewApp extends StatelessWidget {
               },
             );
           }
+
+          // ✅ NAYA: SearchResultsScreen — query string pass hoti hai
+          if (settings.name == SearchResultsScreen.routeName) {
+            final query = settings.arguments as String;
+            return MaterialPageRoute(
+              builder: (_) => SearchResultsScreen(query: query),
+            );
+          }
+
           return null;
         },
       ),

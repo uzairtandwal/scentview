@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; 
 import 'api_service.dart';
 
 class AuthUser {
+  final String? id; 
   final String name;
   final String email;
   final String role;
@@ -15,6 +17,7 @@ class AuthUser {
   final String? address;
 
   const AuthUser({
+    this.id,
     required this.name,
     required this.email,
     required this.role,
@@ -25,11 +28,13 @@ class AuthUser {
   });
 }
 
-// ✅ Is class ko ChangeNotifier banaya hai taake UI ko pata chal sake login hua ya nahi
 class AuthService extends ChangeNotifier {
   final _controller = StreamController<AuthUser?>.broadcast();
   AuthUser? _current;
- final String _baseUrl = 'https://scentview.alwaysdata.net';
+  final String _baseUrl = 'https://scentview.alwaysdata.net';
+  
+  // ✅ GATEKEEPER: Loop ko rokne ke liye
+  static bool _fcmAlreadySynced = false;
 
   AuthService() {
     _bootstrap();
@@ -37,17 +42,58 @@ class AuthService extends ChangeNotifier {
 
   Stream<AuthUser?> get user => _controller.stream;
   AuthUser? get currentUser => _current;
-
-  // ✅ New Getter: Check karne ke liye ke user login hai ya guest
   bool get isAuthenticated => _current != null;
 
   Future<void> _bootstrap() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    if (token != null && token.isNotEmpty) {
+      ApiService.setAuthToken(token);
+    }
     await tryAutoLogin();
   }
 
-  // ✅ New Function: Jo app khulte hi purana token check karega
-  // Iska maqsad app.dart ki logic ko support karna hai
+  // ✅ Token Sync Function: Updated with Gatekeeper
+  Future<void> syncFcmToken(String userId) async {
+    // Agar pehle sync ho chuka hai toh ruk jao
+    if (_fcmAlreadySynced) return; 
+
+    final token = ApiService.authToken;
+    if (kDebugMode) print("🔄 Syncing FCM Token. AuthToken present: ${token != null}");
+
+    try {
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+      
+      if (fcmToken != null) {
+        final response = await http.post(
+          Uri.parse('$_baseUrl/api/update-fcm-token'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({
+            "user_id": userId,
+            "fcm_token": fcmToken,
+          }),
+        );
+
+        if (response.statusCode == 200) {
+          _fcmAlreadySynced = true; // ✅ Mark as synced
+          if (kDebugMode) print("✅ FCM Token Synced Successfully (Only Once)");
+        } else if (response.statusCode == 429) {
+          if (kDebugMode) print("❌ Server Blocked: 429 Error. Waiting for cooldown.");
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print("❌ FCM Sync Error: $e");
+    }
+  }
+
   Future<bool> tryAutoLogin() async {
+    if (kDebugMode) print('------------------------------------------');
+    if (kDebugMode) print('🔍 AUTH_SERVICE: tryAutoLogin CALLED!');
+    if (kDebugMode) print('------------------------------------------');
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     
@@ -56,7 +102,7 @@ class AuthService extends ChangeNotifier {
       return false;
     }
 
-    ApiService.authToken = token;
+    ApiService.setAuthToken(token);
     try {
       final res = await http.get(
         Uri.parse('$_baseUrl/api/me'),
@@ -66,6 +112,7 @@ class AuthService extends ChangeNotifier {
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         _current = AuthUser(
+          id: data['id']?.toString(),
           name: data['name'] ?? '',
           email: data['email'] ?? '',
           role: data['role'] ?? 'user',
@@ -74,12 +121,14 @@ class AuthService extends ChangeNotifier {
           phoneNumber: data['phone_number'],
           address: data['address'],
         );
+
+        if (_current?.id != null) syncFcmToken(_current!.id!);
+
         _controller.add(_current);
-        notifyListeners(); // UI update karne ke liye
+        notifyListeners();
         return true;
       } else {
-        // Agar token expire ho gaya ho
-        ApiService.authToken = null;
+        ApiService.setAuthToken(null);
         _controller.add(null);
         return false;
       }
@@ -90,11 +139,7 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Signs in a user and returns an error message on failure, or null on success.
-  Future<String?> signInWithEmailAndPassword(
-    String email,
-    String password,
-  ) async {
+  Future<String?> signInWithEmailAndPassword(String email, String password) async {
     try {
       final res = await http.post(
         Uri.parse('$_baseUrl/api/login'),
@@ -114,9 +159,13 @@ class AuthService extends ChangeNotifier {
       
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
-      ApiService.authToken = token;
+      ApiService.setAuthToken(token);
       
+      // ✅ Reset sync flag upon new login
+      _fcmAlreadySynced = false;
+
       _current = AuthUser(
+        id: user['id']?.toString(),
         name: user['name'] ?? '',
         email: user['email'] ?? '',
         role: user['role'] ?? 'user',
@@ -125,9 +174,11 @@ class AuthService extends ChangeNotifier {
         phoneNumber: user['phone_number'],
         address: user['address'],
       );
+
+      if (_current?.id != null) await syncFcmToken(_current!.id!);
       
       _controller.add(_current);
-      notifyListeners(); // ✅ UI ko notify karega ke login ho gaya
+      notifyListeners();
       return null;
     } catch (e) {
       if (kDebugMode) print('API Sign-In Error: $e');
@@ -135,12 +186,7 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Creates a new user and returns an error message on failure, or null on success.
-  Future<String?> createUserWithEmailAndPassword(
-    String name,
-    String email,
-    String password,
-  ) async {
+  Future<String?> createUserWithEmailAndPassword(String name, String email, String password) async {
     try {
       final res = await http.post(
         Uri.parse('$_baseUrl/api/register'),
@@ -160,9 +206,13 @@ class AuthService extends ChangeNotifier {
       
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
-      ApiService.authToken = token;
+      ApiService.setAuthToken(token);
       
+      // ✅ Reset sync flag
+      _fcmAlreadySynced = false;
+
       _current = AuthUser(
+        id: user['id']?.toString(),
         name: user['name'] ?? '',
         email: user['email'] ?? '',
         role: user['role'] ?? 'user',
@@ -171,6 +221,8 @@ class AuthService extends ChangeNotifier {
         phoneNumber: user['phone_number'],
         address: user['address'],
       );
+
+      if (_current?.id != null) await syncFcmToken(_current!.id!);
       
       _controller.add(_current);
       notifyListeners();
@@ -194,20 +246,21 @@ class AuthService extends ChangeNotifier {
     
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
-    ApiService.authToken = null;
+    ApiService.setAuthToken(null);
     _current = null;
+    _fcmAlreadySynced = false; // Reset on logout
     _controller.add(null);
-    notifyListeners(); // ✅ UI ko notify karega ke logout ho gaya
+    notifyListeners();
   }
 
   Future<bool> isAdmin() async {
     final u = _current;
     if (u == null) return false;
-    // single predefined admin account
     if (u.email.toLowerCase() == 'waseem@gmail.com') return true;
     return u.role == 'admin';
   }
 
+  @override
   void dispose() {
     _controller.close();
     super.dispose();

@@ -1,14 +1,16 @@
-import 'widgets/app_logo.dart';
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
+
+import '../admin/admin_home_screen.dart';
 import '../services/auth_service.dart';
+import 'main_app_screen.dart';
 import 'registration_screen.dart';
+import 'widgets/app_logo.dart';
 import 'widgets/feedback_dialog.dart';
-import '../admin/admin_home_screen.dart'; // ✅ Admin Home import kiya
 
 class LoginScreen extends StatefulWidget {
   static const routeName = '/login';
-
   const LoginScreen({super.key});
 
   @override
@@ -16,81 +18,80 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _formKey       = GlobalKey<FormState>();
+  final _emailCtrl     = TextEditingController();
+  final _passwordCtrl  = TextEditingController();
+
   bool _isLoading = false;
-  bool _obscure = true;
+  bool _obscure   = true;
 
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── Login Logic ────────────────────────────────────────────────────────────
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     final authService = Provider.of<AuthService>(context, listen: false);
-    
-    // Login API call
     final error = await authService.signInWithEmailAndPassword(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
+      _emailCtrl.text.trim(),
+      _passwordCtrl.text.trim(),
     );
 
-    if (error != null && mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-      await showFeedbackDialog(
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (error != null) {
+      // ── Error ──────────────────────────────────────────
+      await showErrorDialog(
         context,
         title: 'Login Failed',
         message: error,
-        type: FeedbackType.error,
+        actionText: 'Try Again',
       );
-    } else if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      // ✅ SUCCESS LOGIC START
-      // Pehle success dialog dikhao
-      await showFeedbackDialog(
+    } else {
+      // ── Success ────────────────────────────────────────
+      await showSuccessDialog(
         context,
-        title: 'Welcome back!',
+        title: 'Welcome Back!',
         message: 'You have logged in successfully.',
-        type: FeedbackType.success,
+        actionText: 'Continue',
       );
 
-      if (mounted) {
-        // 1. Check karo ke login karne wala ADMIN hai ya nahi
-        final isAdmin = await authService.isAdmin();
-        
-        if (isAdmin) {
-          // 👑 Agar Admin hai to Dashboard par bhej do aur pichle saare raste khatam kar do
-          Navigator.of(context).pushNamedAndRemoveUntil(
-            AdminHomeScreen.routeName,
-            (route) => false,
-          );
+      if (!mounted) return;
+
+      final isAdmin = await authService.isAdmin();
+      if (!mounted) return;
+
+      if (isAdmin) {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AdminHomeScreen.routeName,
+          (route) => false,
+        );
+      } else {
+        // If user was sent here from product page (Buy Now), pop back
+        // Otherwise go to main app
+        if (Navigator.canPop(context)) {
+          Navigator.of(context).pop();
         } else {
-          // 👤 Agar User hai:
-          // Check karo ke kya user ko "Buy Now" daba kar yahan bheja gaya tha?
-          // Agar haan, to Navigator.pop() use karein taake wo product page par wapis chala jaye.
-          // Agar wo normal login karne aaya tha, to usay home par bhej dein.
-          if (Navigator.canPop(context)) {
-            Navigator.of(context).pop(); 
-          } else {
-            Navigator.of(context).pushReplacementNamed('/'); 
-          }
+          Navigator.of(context).pushReplacementNamed(MainAppScreen.routeName);
         }
       }
     }
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme        = Theme.of(context);
+    final colorScheme  = theme.colorScheme;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -98,127 +99,266 @@ class _LoginScreenState extends State<LoginScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              colorScheme.primary.withOpacity(0.12),
-              colorScheme.secondaryContainer.withOpacity(0.10),
+              colorScheme.primary.withValues(alpha: 0.10),
+              colorScheme.secondaryContainer.withValues(alpha: 0.08),
             ],
           ),
         ),
-        child: Center(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.9, end: 1),
-            duration: const Duration(milliseconds: 450),
-            curve: Curves.easeOutBack,
-            builder: (context, scale, child) =>
-                Transform.scale(scale: scale, child: child),
-            child: Card(
-              elevation: 0,
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 24,
-                ),
-                child: Form(
-                  key: _formKey,
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(height: 4),
-                      Hero(tag: 'app-logo', child: const AppLogo(size: 52)),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Welcome back',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Login to continue',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        controller: _emailController,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.email_rounded),
-                        ),
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (value) {
-                          final v = value?.trim() ?? '';
-                          final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-                          if (v.isEmpty) return 'Email is required';
-                          if (!emailRegex.hasMatch(v))
-                            return 'Enter a valid email';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _passwordController,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_rounded),
-                          suffixIcon: IconButton(
-                            onPressed: () =>
-                                setState(() => _obscure = !_obscure),
-                            icon: Icon(
-                              _obscure
-                                  ? Icons.visibility_rounded
-                                  : Icons.visibility_off_rounded,
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.88, end: 1.0),
+                duration: const Duration(milliseconds: 450),
+                curve: Curves.easeOutBack,
+                builder: (_, scale, child) =>
+                    Transform.scale(scale: scale, child: child),
+                child: Card(
+                  elevation: 0,
+                  // ✅ theme surface — dark mode ready
+                  color: colorScheme.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    side: BorderSide(
+                      color: colorScheme.outline.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 28,
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // ── Logo ────────────────────────────────
+                          AppLogo(
+                            size: 56,
+                            heroTag: 'app-logo', // ✅ uses AppLogo heroTag prop
+                            showShadow: true,
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // ── Title ───────────────────────────────
+                          Text(
+                            'Welcome Back',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                              color: colorScheme.onSurface,
                             ),
                           ),
-                        ),
-                        obscureText: _obscure,
-                        validator: (value) {
-                          final v = value ?? '';
-                          if (v.isEmpty) return 'Password is required';
-                          if (v.length < 6) return 'Minimum 6 characters';
-                          return null;
-                        },
-                        onFieldSubmitted: (_) => _isLoading ? null : _login(),
-                      ),
-                      const SizedBox(height: 18),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 250),
-                        child: _isLoading
-                            ? const SizedBox(
-                                key: ValueKey('loading'),
-                                height: 48,
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                  ),
-                                ),
-                              )
-                            : SizedBox(
-                                key: const ValueKey('button'),
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: _login,
-                                  child: const Text('Login'),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Login to continue shopping',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurface.withValues(alpha: 0.55),
+                            ),
+                          ),
+
+                          const SizedBox(height: 28),
+
+                          // ── Email ───────────────────────────────
+                          TextFormField(
+                            controller: _emailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            validator: (v) {
+                              final val = v?.trim() ?? '';
+                              if (val.isEmpty) return 'Email is required';
+                              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$')
+                                  .hasMatch(val)) {
+                                return 'Enter a valid email';
+                              }
+                              return null;
+                            },
+                            decoration: InputDecoration(
+                              labelText: 'Email',
+                              prefixIcon:
+                                  const Icon(Iconsax.sms, size: 20),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: colorScheme.outline.withValues(alpha: 0.3),
                                 ),
                               ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: colorScheme.outline.withValues(alpha: 0.2),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: colorScheme.primary,
+                                  width: 1.5,
+                                ),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: colorScheme.error,
+                                  width: 1.5,
+                                ),
+                              ),
+                              focusedErrorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: colorScheme.error,
+                                  width: 1.5,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.35),
+                            ),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // ── Password ────────────────────────────
+                          TextFormField(
+                            controller: _passwordCtrl,
+                            obscureText: _obscure,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) =>
+                                _isLoading ? null : _login(),
+                            validator: (v) {
+                              final val = v ?? '';
+                              if (val.isEmpty) return 'Password is required';
+                              if (val.length < 6) return 'Minimum 6 characters';
+                              return null;
+                            },
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              prefixIcon:
+                                  const Icon(Iconsax.lock, size: 20),
+                              suffixIcon: IconButton(
+                                onPressed: () =>
+                                    setState(() => _obscure = !_obscure),
+                                icon: Icon(
+                                  _obscure
+                                      ? Iconsax.eye
+                                      : Iconsax.eye_slash,
+                                  size: 20,
+                                ),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: colorScheme.outline.withValues(alpha: 0.2),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: colorScheme.primary,
+                                  width: 1.5,
+                                ),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: colorScheme.error,
+                                  width: 1.5,
+                                ),
+                              ),
+                              focusedErrorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: colorScheme.error,
+                                  width: 1.5,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.35),
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // ── Login Button ────────────────────────
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 250),
+                            child: _isLoading
+                                ? SizedBox(
+                                    key: const ValueKey('loading'),
+                                    height: 52,
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: colorScheme.primary,
+                                      ),
+                                    ),
+                                  )
+                                : SizedBox(
+                                    key: const ValueKey('btn'),
+                                    width: double.infinity,
+                                    height: 52,
+                                    child: ElevatedButton(
+                                      onPressed: _login,
+                                      style: ElevatedButton.styleFrom(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: const Text(
+                                        'Login',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // ── Register Link ───────────────────────
+                          TextButton(
+                            onPressed: _isLoading
+                                ? null
+                                : () => Navigator.of(context)
+                                    .pushNamed(RegistrationScreen.routeName),
+                            style: TextButton.styleFrom(
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: RichText(
+                              text: TextSpan(
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurface
+                                      .withValues(alpha: 0.55),
+                                ),
+                                children: [
+                                  const TextSpan(
+                                      text: "Don't have an account? "),
+                                  TextSpan(
+                                    text: 'Register',
+                                    style: TextStyle(
+                                      color: colorScheme.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 10),
-                      TextButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () {
-                                Navigator.of(context).pushReplacementNamed(
-                                  RegistrationScreen.routeName,
-                                );
-                              },
-                        child: const Text("Don't have an account? Register"),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),

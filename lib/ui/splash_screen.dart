@@ -1,134 +1,116 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
-class SplashScreen extends StatefulWidget {
-  static const routeName = '/splash';
-  const SplashScreen({super.key});
+class ScentViewNeonSplash extends StatefulWidget {
+  final VoidCallback? onFinished;
+  const ScentViewNeonSplash({super.key, this.onFinished});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  State<ScentViewNeonSplash> createState() => _ScentViewNeonSplashState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _slideAnimation;
+class _ScentViewNeonSplashState extends State<ScentViewNeonSplash> with TickerProviderStateMixin {
+  late AnimationController _blueCtrl, _yellowCtrl, _redCtrl, _greenCtrl, _glowCtrl;
+  late Animation<double> _glowAnim;
 
   @override
   void initState() {
     super.initState();
+    _blueCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat();
+    _yellowCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3000))..repeat();
+    _redCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat();
+    _greenCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat();
+    _glowCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
 
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000), // Thora slow aur smooth
+    _glowAnim = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _glowCtrl, curve: Curves.easeInOut),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
-
-    // Text niche se upar slide ho kar aayega
-    _slideAnimation = Tween<double>(begin: 50.0, end: 0.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.fastOutSlowIn),
-    );
-
-    _controller.forward();
-
-    Timer(const Duration(seconds: 4), () {
-      if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed('/home-logic');
+    // ✅ FIXED: Ye block ab 4 second baad onFinished ko call karega
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted && widget.onFinished != null) {
+        widget.onFinished!(); 
+      }
     });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _blueCtrl.dispose(); _yellowCtrl.dispose(); _redCtrl.dispose();
+    _greenCtrl.dispose(); _glowCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          // Luxury Deep Black & Charcoal Gradient
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0F0F0F), 
-              Color(0xFF232323),
+      backgroundColor: const Color(0xFF0B0D15),
+      body: Center(
+        child: SizedBox(
+          width: 320, height: 320,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              _buildRing(_blueCtrl, const Color(0xFF00CFFF), 4, 140, 70, 0),
+              _buildRing(_yellowCtrl, const Color(0xFFFFD84A), 4, 110, 55, math.pi / 4),
+              _buildRing(_redCtrl, const Color(0xFFFF4B7A), 3, 80, 40, 0),
+              _buildRing(_greenCtrl, const Color(0xFF33FFAA), 3, 60, 30, math.pi / 3),
+              AnimatedBuilder(
+                animation: _glowAnim,
+                builder: (_, __) => _NeonText(glowOpacity: _glowAnim.value),
+              ),
             ],
           ),
         ),
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return FadeTransition(
-              opacity: _fadeAnimation,
-              child: Transform.translate(
-                offset: Offset(0, _slideAnimation.value),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // --- GOLDEN LOGO AREA ---
-                    Container(
-                      height: 120,
-                      width: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFD4AF37).withOpacity(0.3), // Gold Shadow
-                            blurRadius: 30,
-                            spreadRadius: 5,
-                          )
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.auto_awesome, // Modern Star/Magic icon
-                        size: 70,
-                        color: Color(0xFFD4AF37), // Metallic Gold Color
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    // --- BRAND NAME ---
-                    const Text(
-                      'SCENTVIEW',
-                      style: TextStyle(
-                        fontSize: 42,
-                        fontWeight: FontWeight.w300, // Thin luxury font
-                        color: Color(0xFFD4AF37), 
-                        letterSpacing: 12, // More space between letters
-                        fontFamily: 'Serif', 
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    // --- SUBTITLE ---
-                    Container(
-                      height: 1,
-                      width: 100,
-                      color: const Color(0xFFD4AF37).withOpacity(0.5),
-                    ),
-                    const SizedBox(height: 15),
-                    const Text(
-                      'THE ART OF FRAGRANCE',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white60,
-                        letterSpacing: 4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+      ),
+    );
+  }
+
+  Widget _buildRing(AnimationController ctrl, Color col, int count, double len, double rad, double offset) {
+    return AnimatedBuilder(
+      animation: ctrl,
+      builder: (_, __) => Transform.rotate(
+        angle: ctrl.value * 2 * math.pi,
+        child: CustomPaint(
+          size: const Size(320, 320),
+          painter: _LineRingPainter(color: col, lineCount: count, lineLength: len, lineWidth: 3, radius: rad, startAngle: offset),
         ),
       ),
     );
+  }
+}
+
+// Painter aur NeonText classes same rahengi (jo aapne pehle bheji thin)
+class _LineRingPainter extends CustomPainter {
+  final Color color; final int lineCount; final double lineLength; final double lineWidth; final double radius; final double startAngle;
+  _LineRingPainter({required this.color, required this.lineCount, required this.lineLength, required this.lineWidth, required this.radius, required this.startAngle});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final angleStep = (2 * math.pi) / lineCount;
+    for (int i = 0; i < lineCount; i++) {
+      final angle = startAngle + (i * angleStep);
+      final dx = math.cos(angle); final dy = math.sin(angle);
+      final start = Offset(center.dx + dx * (radius - lineLength / 2), center.dy + dy * (radius - lineLength / 2));
+      final end = Offset(center.dx + dx * (radius + lineLength / 2), center.dy + dy * (radius + lineLength / 2));
+      canvas.drawLine(start, end, Paint()..color = color.withOpacity(0.25)..strokeWidth = lineWidth * 5..strokeCap = StrokeCap.round..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12));
+      canvas.drawLine(start, end, Paint()..color = color.withOpacity(0.5)..strokeWidth = lineWidth * 2.5..strokeCap = StrokeCap.round..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+      canvas.drawLine(start, end, Paint()..strokeWidth = lineWidth..strokeCap = StrokeCap.round..shader = LinearGradient(colors: [Colors.transparent, color, color, Colors.transparent], stops: const [0.0, 0.2, 0.8, 1.0]).createShader(Rect.fromPoints(start, end)));
+    }
+  }
+  @override bool shouldRepaint(_LineRingPainter old) => false;
+}
+
+class _NeonText extends StatelessWidget {
+  final double glowOpacity;
+  const _NeonText({required this.glowOpacity});
+  @override
+  Widget build(BuildContext context) {
+    return Stack(alignment: Alignment.center, children: [
+      Text('SCENTVIEW', style: TextStyle(fontSize: 18, letterSpacing: 6, fontWeight: FontWeight.w300, foreground: Paint()..color = const Color(0xFF00AEFF).withOpacity(glowOpacity * 0.4)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18))),
+      Text('SCENTVIEW', style: TextStyle(fontSize: 18, letterSpacing: 6, fontWeight: FontWeight.w300, foreground: Paint()..color = const Color(0xFF0066FF).withOpacity(glowOpacity * 0.6)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8))),
+      Text('SCENTVIEW', style: TextStyle(fontSize: 18, letterSpacing: 6, fontWeight: FontWeight.w300, color: Color.lerp(const Color(0xFF88CCFF), const Color(0xFFC1E6FF), glowOpacity))),
+    ]);
   }
 }

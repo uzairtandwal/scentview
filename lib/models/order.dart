@@ -32,10 +32,11 @@ class OrderItem {
   };
 
   factory OrderItem.fromJson(Map<String, dynamic> json) => OrderItem(
-    id: json['id'] as String,
-    name: json['name'] as String,
-    price: (json['price'] as num).toDouble(),
-    quantity: json['quantity'] as int,
+    // .toString() aur double.tryParse dono laga diye hain taake data type ka masla na aaye
+    id: json['id']?.toString() ?? '', 
+    name: json['name'] as String? ?? 'No Name',
+    price: double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,
+    quantity: int.tryParse(json['quantity']?.toString() ?? '1') ?? 1,
     imageUrl: json['imageUrl'] as String?,
   );
 }
@@ -45,7 +46,7 @@ class Order {
   final DateTime createdAt;
   final List<OrderItem> items;
   final double total;
-  final String status; // e.g., Placed, Shipped, Delivered
+  final String status; 
   final String paymentMethod;
   final String shippingAddress;
 
@@ -70,14 +71,15 @@ class Order {
   };
 
   factory Order.fromJson(Map<String, dynamic> json) => Order(
-    id: json['id'] as String,
-    createdAt: DateTime.parse(json['createdAt'] as String),
-    items: (json['items'] as List)
-        .map((e) => OrderItem.fromJson(Map<String, dynamic>.from(e)))
-        .toList(),
-    total: (json['total'] as num).toDouble(),
+    // Sab fields ko safe bana diya hai
+    id: json['id']?.toString() ?? '', 
+    createdAt: DateTime.parse(json['createdAt'] ?? json['created_at'] ?? DateTime.now().toIso8601String()),
+    items: (json['items'] as List?)
+            ?.map((e) => OrderItem.fromJson(Map<String, dynamic>.from(e)))
+            .toList() ?? [],
+    total: double.tryParse(json['total']?.toString() ?? json['total_amount']?.toString() ?? '0') ?? 0.0,
     status: json['status'] as String? ?? 'Placed',
-    paymentMethod: json['paymentMethod'] as String,
-    shippingAddress: json['shippingAddress'] as String,
+    paymentMethod: json['payment_method'] ?? json['paymentMethod'] ?? 'COD',
+    shippingAddress: json['shipping_address'] ?? json['shippingAddress'] ?? 'No Address',
   );
 }

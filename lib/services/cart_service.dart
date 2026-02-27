@@ -3,14 +3,47 @@ import '../models/product_model.dart';
 
 class CartService with ChangeNotifier {
   final List<Product> _items = [];
+  final List<Product> _savedItems = []; // ✅ Save for Later list
+
+  // ✅ Coupon & Discount Variables
+  double _discountAmount = 0.0;
+  String? _appliedCouponCode;
 
   List<Product> get items => _items;
+  List<Product> get savedItems => _savedItems;
 
-  double get totalPrice {
-    return _items.fold(0.0, (sum, current) => sum + current.originalPrice);
+  // ✅ 1. Subtotal (Bina discount ke total price)
+  double get subtotal {
+    return _items.fold(0.0, (sum, current) => sum + (current.salePrice ?? current.originalPrice));
   }
 
+  // ✅ 2. Total Price (Discount nikaal kar final payment)
+  double get totalPrice {
+    double finalAmount = subtotal - _discountAmount;
+    return finalAmount > 0 ? finalAmount : 0.0;
+  }
+
+  double get discountAmount => _discountAmount;
+  String? get appliedCouponCode => _appliedCouponCode;
   int get itemCount => _items.length;
+
+  // ================= COUPON LOGIC =================
+
+  // ✅ Discount apply karne ka function
+  void applyDiscount(double amount, String code) {
+    _discountAmount = amount;
+    _appliedCouponCode = code;
+    notifyListeners();
+  }
+
+  // ✅ Discount reset karne ka function
+  void resetDiscount() {
+    _discountAmount = 0.0;
+    _appliedCouponCode = null;
+    notifyListeners();
+  }
+
+  // ================= CART OPERATIONS =================
 
   void add(Product product) {
     _items.add(product);
@@ -22,22 +55,52 @@ class CartService with ChangeNotifier {
     notifyListeners();
   }
 
+  // ✅ ID ke zariye poora item group khatam karna
+  void removeItem(dynamic productId) {
+    _items.removeWhere((item) => item.id == productId);
+    notifyListeners();
+  }
+
+  // ================= SAVE FOR LATER LOGIC =================
+
+  void saveForLater(Product product) {
+    // Cart se saare ek jaise items nikalo
+    _items.removeWhere((item) => item.id == product.id);
+    
+    // Agar saved list mein nahi hai to add karo
+    if (!_savedItems.any((item) => item.id == product.id)) {
+      _savedItems.add(product);
+    }
+    notifyListeners();
+  }
+
+  void moveToCart(Product product) {
+    // Saved list se hatao
+    _savedItems.removeWhere((item) => item.id == product.id);
+    // Cart mein wapas dalo
+    add(product);
+    notifyListeners();
+  }
+
+  // ================= QUANTITY LOGIC =================
+
   void updateQuantity(Product product, int quantity) {
     final currentQuantity = getQuantity(product);
 
-    if (quantity < currentQuantity) {
-      // Remove items
-      for (int i = 0; i < currentQuantity - quantity; i++) {
-        _items.removeWhere((item) => item.id == product.id);
+    if (quantity <= 0) {
+      _items.removeWhere((item) => item.id == product.id);
+    } else if (quantity < currentQuantity) {
+      // Jitne kam karne hain, utne instances remove karo
+      int toRemove = currentQuantity - quantity;
+      for (int i = 0; i < toRemove; i++) {
+        int index = _items.indexWhere((item) => item.id == product.id);
+        if (index != -1) _items.removeAt(index);
       }
     } else if (quantity > currentQuantity) {
-      // Add items
+      // Jitne badhane hain, utne add karo
       for (int i = 0; i < quantity - currentQuantity; i++) {
         _items.add(product);
       }
-    } else if (quantity == 0) {
-      // Remove all instances
-      _items.removeWhere((item) => item.id == product.id);
     }
     notifyListeners();
   }
@@ -48,6 +111,7 @@ class CartService with ChangeNotifier {
 
   void clear() {
     _items.clear();
+    resetDiscount(); // Cart khali to discount bhi khatam
     notifyListeners();
   }
 }

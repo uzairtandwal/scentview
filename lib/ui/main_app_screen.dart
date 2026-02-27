@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
+
 import '../services/cart_service.dart';
-import 'home_screen.dart';
-import 'shop_screen.dart';
 import 'cart_screen.dart';
+import 'home_screen.dart';
 import 'profile_screen.dart';
+import 'shop_screen.dart';
 import 'widgets/custom_app_bar.dart';
 
 class MainAppScreen extends StatefulWidget {
@@ -19,59 +21,23 @@ class _MainAppScreenState extends State<MainAppScreen> {
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
   DateTime? _lastBackPressTime;
+  String _searchQuery = '';
 
-  // List of pages to be displayed
-  final List<Widget> _pages = [
-    const HomeScreen(),
-    const ShopScreen(),
-    const CartScreen(),
-    const ProfileScreen(),
+  // ── Nav items config ──────────────────────────────────────────────────────
+  static const _navItems = [
+    _NavItem(label: 'Home',    icon: Iconsax.home,          activeIcon: Iconsax.home_15),
+    _NavItem(label: 'Shop',    icon: Iconsax.shop,           activeIcon: Iconsax.shop5),
+    _NavItem(label: 'Cart',    icon: Iconsax.shopping_cart,  activeIcon: Iconsax.shopping_cart5),
+    _NavItem(label: 'Profile', icon: Iconsax.user,           activeIcon: Iconsax.user5),
   ];
 
-  // Bottom navigation bar items data
-  final List<_NavItemData> _navItemsData = [
-    _NavItemData(
-      icon: Icons.home_outlined,
-      activeIcon: Icons.home_rounded,
-      label: 'Home',
-    ),
-    _NavItemData(
-      icon: Icons.store_outlined,
-      activeIcon: Icons.store_rounded,
-      label: 'Shop',
-    ),
-    _NavItemData(
-      icon: Icons.shopping_cart_outlined,
-      activeIcon: Icons.shopping_cart_rounded,
-      label: 'Cart',
-      showBadge: true,
-    ),
-    _NavItemData(
-      icon: Icons.person_outlined,
-      activeIcon: Icons.person_rounded,
-      label: 'Profile',
-    ),
-  ];
-
-  void _onItemTapped(int index) {
-    if (_selectedIndex == index) {
-      // If tapping the same tab, scroll to top if possible
-      _scrollToTop();
-    } else {
-      setState(() {
-        _selectedIndex = index;
-        _pageController.animateToPage(
-          index,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      });
-    }
-  }
-
-  void _scrollToTop() {
-    // This method can be expanded to scroll each page to top
-    // Currently, it's a placeholder for future enhancement
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is int) _navigateTo(args);
+    });
   }
 
   @override
@@ -80,213 +46,215 @@ class _MainAppScreenState extends State<MainAppScreen> {
     super.dispose();
   }
 
-  Future<bool> _onWillPop() async {
-    final now = DateTime.now();
-    
-    // If on home screen, show exit confirmation
-    if (_selectedIndex == 0) {
-      if (_lastBackPressTime == null ||
-          now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
-        _lastBackPressTime = now;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Press back again to exit',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-          ),
-        );
-        return false;
-      }
-      return true;
-    } else {
-      // If not on home screen, go to home screen
-      setState(() {
-        _selectedIndex = 0;
-        _pageController.animateToPage(
-          0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      });
-      return false;
-    }
+  // ── Navigation ────────────────────────────────────────────────────────────
+  void _navigateTo(int index) {
+    if (_selectedIndex == index) return;
+    setState(() => _selectedIndex = index);
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeInOut,
+    );
   }
 
+  // ── Back press — double tap to exit ──────────────────────────────────────
+  bool _handleBackPress() {
+    // Not on home tab → go home
+    if (_selectedIndex != 0) {
+      _navigateTo(0);
+      return true; // handled
+    }
+
+    // On home tab → double tap to exit
+    final now = DateTime.now();
+    final isSecondPress = _lastBackPressTime != null &&
+        now.difference(_lastBackPressTime!) <= const Duration(seconds: 2);
+
+    if (isSecondPress) return false; // allow exit
+
+    _lastBackPressTime = now;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Press back again to exit'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+    return true; // handled — don't exit yet
+  }
+
+  // ── AppBar ────────────────────────────────────────────────────────────────
+  // Home has its own AppBar — for other tabs we use CustomAppBar
+  PreferredSizeWidget? _buildAppBar() {
+    if (_selectedIndex == 0) return null; // HomeScreen handles its own
+
+    return CustomAppBar(
+      showSearch: _selectedIndex == 1, // only Shop tab
+      hintText: 'Search fragrances...',
+      showLogo: _selectedIndex == 1,
+      onSearchChanged: _selectedIndex == 1
+          ? (val) => setState(() => _searchQuery = val)
+          : null,
+    );
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    final theme = Theme.of(context);
+
+    // Pages — rebuilt only when needed
+    final pages = [
+      const HomeScreen(),
+      ShopScreen(searchQuery: _searchQuery),
+      const CartScreen(),
+      const ProfileScreen(),
+    ];
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBackPress();
+      },
       child: Scaffold(
-        // Custom App Bar with dynamic title
-        appBar: _buildCustomAppBar(),
-        
-        // PageView for smooth horizontal navigation
+        appBar: _buildAppBar(),
         body: PageView(
           controller: _pageController,
-          onPageChanged: (index) {
-            setState(() {
-              _selectedIndex = index;
-            });
-          },
-          physics: const BouncingScrollPhysics(),
-          children: _pages,
+          // ✅ Disable swipe — prevents accidental page changes
+          physics: const NeverScrollableScrollPhysics(),
+          onPageChanged: (i) => setState(() => _selectedIndex = i),
+          children: pages,
         ),
-        
-        // Official Bottom Navigation Bar (Standard Design)
-        bottomNavigationBar: _buildBottomNavigationBar(context),
+        bottomNavigationBar: _BottomNav(
+          selectedIndex: _selectedIndex,
+          onTap: _navigateTo,
+          navItems: _navItems,
+        ),
       ),
     );
   }
+}
 
-  // ================ CUSTOM APP BAR ================
-  PreferredSizeWidget _buildCustomAppBar() {
-    // Hide app bar on home screen for cleaner look
-    if (_selectedIndex == 0) {
-      return const PreferredSize(
-        preferredSize: Size.fromHeight(0),
-        child: SizedBox(),
-      );
-    }
-    
-    // Show custom app bar on other screens
-    return CustomAppBar(
-      showSearch: _selectedIndex == 1, // Show search only on Shop screen
-      hintText: _getAppBarHintText(),
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      showLogo: _selectedIndex == 1, // Show logo on Shop screen
-    );
-  }
+// ─── Nav Item Model ───────────────────────────────────────────────────────────
+class _NavItem {
+  final String label;
+  final IconData icon;
+  final IconData activeIcon;
 
-  String _getAppBarHintText() {
-    switch (_selectedIndex) {
-      case 1: return 'Search products...';
-      case 2: return 'Search in cart...';
-      case 3: return 'Search profile...';
-      default: return 'Search...';
-    }
-  }
+  const _NavItem({
+    required this.label,
+    required this.icon,
+    required this.activeIcon,
+  });
+}
 
-  // ================ OFFICIAL BOTTOM NAVIGATION BAR ================
-  Widget _buildBottomNavigationBar(BuildContext context) {
+// ─── Bottom Navigation Bar ────────────────────────────────────────────────────
+class _BottomNav extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+  final List<_NavItem> navItems;
+
+  const _BottomNav({
+    required this.selectedIndex,
+    required this.onTap,
+    required this.navItems,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Consumer<CartService>(
-      builder: (context, cart, child) {
-        return BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          selectedItemColor: Theme.of(context).colorScheme.primary,
-          unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-          selectedLabelStyle: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          unselectedLabelStyle: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-          ),
-          elevation: 8,
-          showSelectedLabels: true,
-          showUnselectedLabels: true,
-          items: [
-            BottomNavigationBarItem(
-              icon: Icon(
-                _selectedIndex == 0 
-                  ? Icons.home_rounded 
-                  : Icons.home_outlined,
-                size: 24,
-              ),
-              label: 'Home',
-              tooltip: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(
-                _selectedIndex == 1 
-                  ? Icons.store_rounded 
-                  : Icons.store_outlined,
-                size: 24,
-              ),
-              label: 'Shop',
-              tooltip: 'Shop',
-            ),
-            BottomNavigationBarItem(
-              icon: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(
-                    _selectedIndex == 2 
-                      ? Icons.shopping_cart_rounded 
-                      : Icons.shopping_cart_outlined,
-                    size: 24,
-                  ),
-                  if (cart.itemCount > 0)
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade500,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.surface,
-                            width: 2,
-                          ),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 18,
-                          minHeight: 18,
-                        ),
-                        child: Text(
-                          cart.itemCount > 9 ? '9+' : cart.itemCount.toString(),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            height: 1,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              label: 'Cart',
-              tooltip: 'Cart',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(
-                _selectedIndex == 3 
-                  ? Icons.person_rounded 
-                  : Icons.person_outlined,
-                size: 24,
-              ),
-              label: 'Profile',
-              tooltip: 'Profile',
-            ),
-          ],
+      builder: (_, cart, __) {
+        return NavigationBar(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: onTap,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          animationDuration: const Duration(milliseconds: 300),
+          destinations: navItems.asMap().entries.map((entry) {
+            final i    = entry.key;
+            final item = entry.value;
+
+            // Cart tab — show badge
+            if (i == 2) {
+              return NavigationDestination(
+                icon: _CartIcon(
+                  icon: item.icon,
+                  count: cart.itemCount,
+                  isActive: false,
+                  theme: theme,
+                ),
+                selectedIcon: _CartIcon(
+                  icon: item.activeIcon,
+                  count: cart.itemCount,
+                  isActive: true,
+                  theme: theme,
+                ),
+                label: item.label,
+              );
+            }
+
+            return NavigationDestination(
+              icon: Icon(item.icon),
+              selectedIcon: Icon(item.activeIcon),
+              label: item.label,
+            );
+          }).toList(),
         );
       },
     );
   }
 }
 
-// ================ NAVIGATION ITEM DATA CLASS ================
-class _NavItemData {
+// ─── Cart Icon with Badge ─────────────────────────────────────────────────────
+class _CartIcon extends StatelessWidget {
   final IconData icon;
-  final IconData activeIcon;
-  final String label;
-  final bool showBadge;
+  final int count;
+  final bool isActive;
+  final ThemeData theme;
 
-  const _NavItemData({
+  const _CartIcon({
     required this.icon,
-    required this.activeIcon,
-    required this.label,
-    this.showBadge = false,
+    required this.count,
+    required this.isActive,
+    required this.theme,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon),
+        if (count > 0)
+          Positioned(
+            top: -6,
+            right: -8,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.error,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: theme.colorScheme.surface,
+                  width: 1.5,
+                ),
+              ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }

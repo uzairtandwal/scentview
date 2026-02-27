@@ -1,3 +1,5 @@
+import 'package:scentview/admin/admin_home_screen.dart';
+import 'package:scentview/ui/main_app_screen.dart';
 import 'widgets/app_logo.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -60,6 +62,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         message: 'Your account has been created successfully.',
         type: FeedbackType.success,
       );
+
+      if (mounted) {
+        final isAdmin = await authService.isAdmin();
+        if (isAdmin) {
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            AdminHomeScreen.routeName,
+            (route) => false,
+          );
+        } else {
+          if (Navigator.canPop(context)) {
+            Navigator.of(context).pop();
+          } else {
+            Navigator.of(context).pushReplacementNamed(MainAppScreen.routeName);
+          }
+        }
+      }
     }
   }
 

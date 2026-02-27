@@ -34,62 +34,62 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
   }
 
   Future<void> _saveForm() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
+  if (!_formKey.currentState!.validate()) {
+    return;
+  }
+  _formKey.currentState!.save();
+
+  setState(() {
+    _isLoading = true;
+  });
+
+  // ✅ Sahi Token yahan se uthayein
+  final authToken = ApiService.authToken;
+
+  try {
+    final isUpdating = widget.category != null;
+
+    if (isUpdating) {
+      await _api.updateCategory(
+        id: widget.category!.id.toString(),
+        name: _nameController.text,
+        imageFile: _pickedImage,
+        token: authToken, // ✅ Ab sahi token jayega
+      );
+    } else {
+      await _api.createCategory(
+        name: _nameController.text,
+        imageFile: _pickedImage,
+        token: authToken, // ✅ Ab sahi token jayega
+      );
     }
-    _formKey.currentState!.save();
 
-    setState(() {
-      _isLoading = true;
-    });
-
-    const String authToken = "YOUR_AUTH_TOKEN_HERE";
-
-    try {
-      final isUpdating = widget.category != null;
-
-      if (isUpdating) {
-        await _api.updateCategory(
-          id: widget.category!.id.toString(),
-          name: _nameController.text,
-          imageFile: _pickedImage,
-          token: authToken,
-        );
-      } else {
-        await _api.createCategory(
-          name: _nameController.text,
-          imageFile: _pickedImage,
-          token: authToken,
-        );
-      }
-
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Category ${isUpdating ? 'updated' : 'saved'} successfully!',
-          ),
+          content: Text('Category ${isUpdating ? 'updated' : 'saved'} successfully!'),
           backgroundColor: Colors.green,
         ),
       );
-
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
+      Navigator.of(context).pop();
+    }
+  } catch (e) {
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('An error occurred: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: Colors.red,
         ),
       );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    }
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
