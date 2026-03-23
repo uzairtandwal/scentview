@@ -126,6 +126,6 @@ class Banner {
     if (cleanPath.startsWith('/')) {
       cleanPath = cleanPath.substring(1);
     }
-    return 'https://scentview.alwaysdata.net/storage/uploads/$cleanPath';
+    return 'https://bgnupk.online/storage/uploads/$cleanPath';
   }
 }

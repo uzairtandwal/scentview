@@ -7,12 +7,14 @@ import '../models/order.dart';
 import '../models/product_model.dart';
 import 'api_service.dart';
 
+import 'package:scentview/utils/url_utils.dart';
+
 class OrdersService with ChangeNotifier {
   static const _storageKey = 'orders_v1';
   final List<Order> _orders = [];
   
-  // ✅ Sahi HTTPS URL
-  final String _baseUrl = 'https://scentview.alwaysdata.net'; 
+  // ✅ Base URL from UrlUtils
+  final String _baseUrl = '${UrlUtils.domainUrl}/api/v1';
 
   List<Order> get orders => List.unmodifiable(_orders.reversed);
 
@@ -23,7 +25,7 @@ class OrdersService with ChangeNotifier {
 
     try {
       final res = await http.get(
-        Uri.parse('$_baseUrl/api/orders'),
+        Uri.parse('$_baseUrl/orders'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -31,9 +33,17 @@ class OrdersService with ChangeNotifier {
       );
 
       if (res.statusCode == 200) {
-        final list = (jsonDecode(res.body) as List).cast<Map<String, dynamic>>();
+        final decoded = jsonDecode(res.body);
+        List<dynamic> list = [];
+        
+        if (decoded is List) {
+          list = decoded;
+        } else if (decoded is Map) {
+          list = decoded['data'] ?? [];
+        }
+        
         _orders.clear();
-        _orders.addAll(list.map(Order.fromJson));
+        _orders.addAll(list.map((e) => Order.fromJson(Map<String, dynamic>.from(e))));
         notifyListeners();
         _save(); 
       }
@@ -64,7 +74,7 @@ class OrdersService with ChangeNotifier {
       if (kDebugMode) print('📦 Sending Order Data with Key: $idempotencyKey');
       
       final response = await http.post(
-        Uri.parse('$_baseUrl/api/orders'),
+        Uri.parse('$_baseUrl/orders'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',

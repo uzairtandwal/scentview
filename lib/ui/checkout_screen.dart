@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:scentview/models/order.dart';
 import 'package:scentview/services/auth_service.dart';
 import 'package:scentview/services/cart_service.dart';
 import 'package:scentview/services/orders_service.dart';
+import 'login_screen.dart';
 import 'widgets/feedback_dialog.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -92,8 +94,8 @@ class _CheckoutScreenState extends State<CheckoutScreen>
       if (user != null) {
         // Safely try to get phone/address — graceful fallback
         final dynamic u = user;
-        _phoneCtrl.text = (u.phone as String?) ?? '';
-        _addressCtrl.text = (u.address as String?) ?? '';
+        _phoneCtrl.text = '';
+_addressCtrl.text = '';
       }
     });
   }
@@ -126,6 +128,15 @@ class _CheckoutScreenState extends State<CheckoutScreen>
 
   // ── Place Order ───────────────────────────────────────────────────────────
   Future<void> _placeOrder(CartService cart) async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+
+    // ✅ CHECK AUTH: If not logged in, send to Login Screen
+    if (!authService.isAuthenticated) {
+      final loginResult = await Navigator.pushNamed(context, LoginScreen.routeName);
+      // If user comes back without logging in, don't proceed
+      if (!authService.isAuthenticated) return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isPlacingOrder = true);
@@ -136,7 +147,7 @@ class _CheckoutScreenState extends State<CheckoutScreen>
     final orderItems = cart.items.map((item) => {
           'product_id': item.id,
           'quantity': cart.getQuantity(item),
-          'price': item.salePrice ?? item.originalPrice,
+          'price': item.price,
         }).toList();
 
     final orderData = {
@@ -155,18 +166,55 @@ class _CheckoutScreenState extends State<CheckoutScreen>
 
     if (createdOrder != null) {
       setState(() => _orderPlaced = true);
-      cart.clear();
+      
+      // ── Build WhatsApp Message (Official Style) ──────────────────────────
+      final StringBuffer buffer = StringBuffer();
+      buffer.writeln("*Greetings Scent-View!* 🌸");
+      buffer.writeln("I have just placed an order and I'm very interested in these products! 😍");
+      buffer.writeln("");
+      buffer.writeln("🆔 *Order ID:* #${createdOrder.id}");
+      buffer.writeln("📦 *Items Details:*");
+      
+      for (var item in cart.items) {
+        final qty = cart.getQuantity(item);
+        buffer.writeln("- ${item.name} (x$qty) = PKR ${item.price * qty}");
+      }
+      
+      buffer.writeln("");
+      buffer.writeln("💰 *Total Amount:* PKR ${totalAmount.toStringAsFixed(0)}");
+      buffer.writeln("📍 *Address:* ${createdOrder.shippingAddress}");
+      buffer.writeln("📞 *Phone:* ${_phoneCtrl.text.trim()}");
+      buffer.writeln("💳 *Payment:* ${createdOrder.paymentMethod.toUpperCase()}");
+      buffer.writeln("");
+      buffer.writeln("❓ *Question:* How long will it take for delivery?");
+      buffer.writeln("");
+      buffer.writeln("Please confirm my order. Thank you! 🙏");
+
+      final whatsappUrl = "https://wa.me/923079417399?text=${Uri.encodeComponent(buffer.toString())}";
+
+      cart.clear(); // Clear cart AFTER building message
+
+      // ── Show Success & Launch WhatsApp ─────────────────────────────────────
       await showSuccessDialog(
         context,
         title: 'Order Placed!',
         message:
             'Your order has been confirmed.\nWe\'ll notify you when it\'s on the way.',
-        actionText: 'Continue Shopping',
-        onAction: () => Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/main-app',
-          (route) => false,
-        ),
+        actionText: 'Continue to WhatsApp',
+        onAction: () async {
+          // Launch WhatsApp
+          if (await canLaunchUrl(Uri.parse(whatsappUrl))) {
+            await launchUrl(Uri.parse(whatsappUrl), mode: LaunchMode.externalApplication);
+          }
+          
+          if (mounted) {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/main-app',
+              (route) => false,
+            );
+          }
+        },
       );
     } else {
       await showErrorDialog(
@@ -871,27 +919,38 @@ class _BottomBar extends StatelessWidget {
       child: ElevatedButton(
         onPressed: (isPlacing || isPlaced) ? null : onConfirm,
         style: ElevatedButton.styleFrom(
-          minimumSize: const Size(double.infinity, 54),
+          backgroundColor: theme.colorScheme.primary,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 56),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          elevation: 0,
+          elevation: 8,
+          shadowColor: theme.colorScheme.primary.withValues(alpha: 0.4),
         ),
         child: isPlacing
             ? const SizedBox(
-                width: 22,
-                height: 22,
+                width: 24,
+                height: 24,
                 child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
+                  strokeWidth: 3,
                   color: Colors.white,
                 ),
               )
-            : Text(
-                'Confirm Order · PKR ${total.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                ),
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Iconsax.verify5, size: 20),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Confirm Order · PKR ${total.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
       ),
     );

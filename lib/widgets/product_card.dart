@@ -6,11 +6,15 @@ class ProductCard extends StatefulWidget {
   final Product product;
   final bool isCompact;
   final VoidCallback onTap;
+  final bool showFavorite;
+  final bool showQuickAdd;
 
   const ProductCard({
     required this.product,
     required this.isCompact,
     required this.onTap,
+    this.showFavorite = true,
+    this.showQuickAdd = true,
     super.key,
   });
 
@@ -20,21 +24,50 @@ class ProductCard extends StatefulWidget {
 
 class _ProductCardState extends State<ProductCard>
     with SingleTickerProviderStateMixin {
-  // ── Press animation ──────────────────────────────────────────
   late AnimationController _pressCtrl;
   late Animation<double> _scaleAnim;
   bool _isWishlisted = false;
 
-  // ── Aapka existing badge color logic — same ──
+  // ✅ Sale check
+  bool get _onSale =>
+      widget.product.salePrice != null &&
+      widget.product.salePrice! > 0 &&
+      widget.product.salePrice! < widget.product.price;
+
+  // ✅ Discount % auto calculate
+  int get _discountPercent {
+    if (!_onSale) return 0;
+    return (((widget.product.price - widget.product.salePrice!) /
+                widget.product.price) *
+            100)
+        .round();
+  }
+
+  // ✅ Out of stock — quantity 10 se kam
+  bool get _isOutOfStock => widget.product.quantity < 10;
+
+  // ✅ Badge colors
   Color _getBadgeColor(String? text) {
-    if (text == null) return Colors.red;
-    switch (text.toLowerCase()) {
-      case 'new':
-        return Colors.green;
-      case 'sale':
-        return Colors.red;
+    if (text == null) return Colors.blue;
+    final lowerText = text.toLowerCase();
+    
+    if (lowerText.contains('sold') || lowerText.contains('out')) {
+      return Colors.red;
+    }
+    if (lowerText.contains('new')) {
+      return Colors.blue;
+    }
+    if (lowerText.contains('sale') || lowerText.contains('%')) {
+      return Colors.red;
+    }
+
+    switch (lowerText) {
       case 'hot':
         return Colors.orange;
+      case 'coming soon':
+      case 'soon':
+      case 'upcoming':
+        return Colors.purple;
       default:
         return Colors.blue;
     }
@@ -71,20 +104,14 @@ class _ProductCardState extends State<ProductCard>
           widget.onTap();
         },
         onTapCancel: () => _pressCtrl.reverse(),
-        // ── isCompact = true  → List tile (horizontal) ──
-        // ── isCompact = false → Grid card (vertical)   ──
         child: widget.isCompact ? _buildListTile() : _buildGridCard(),
       ),
     );
   }
 
-  // ════════════════════════════════════════════════════════════
-  // GRID CARD (isCompact: false)
-  // ════════════════════════════════════════════════════════════
+  // ─── Grid Card ───────────────────────────────────────────────
   Widget _buildGridCard() {
     final product = widget.product;
-    final bool onSale =
-        product.salePrice != null && product.salePrice! > 0;
     final bool hasBadge =
         product.badgeText != null && product.badgeText!.isNotEmpty;
 
@@ -106,214 +133,83 @@ class _ProductCardState extends State<ProductCard>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Image section ──
             Expanded(
               child: Stack(
                 children: [
-                  // Image
+                  // ── Image ──
                   Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.grey.shade50,
-                          Colors.white,
-                        ],
+                        colors: [Colors.grey.shade50, Colors.white],
                       ),
                     ),
                     child: Image.network(
                       product.imageUrl,
                       fit: BoxFit.cover,
-                      loadingBuilder: (_, child, progress) {
-                        if (progress == null) return child;
-                        return Center(
-                          child: CircularProgressIndicator(
-                            value: progress.expectedTotalBytes != null
-                                ? progress.cumulativeBytesLoaded /
-                                    progress.expectedTotalBytes!
-                                : null,
-                            strokeWidth: 2,
-                            color: const Color(0xFF6C63FF),
-                          ),
-                        );
-                      },
                       errorBuilder: (_, __, ___) => Container(
                         color: Colors.grey.shade100,
                         child: Center(
-                          child: Icon(
-                            Iconsax.image,
-                            color: Colors.grey.shade400,
-                            size: 36,
-                          ),
+                          child: Icon(Iconsax.image,
+                              color: Colors.grey.shade300, size: 36),
                         ),
                       ),
                     ),
                   ),
 
-                  // Badge
-                  if (hasBadge)
+                  // ✅ Priority: OUT OF STOCK > Badge (NEW/SALE/HOT/COMING SOON)
+                  if (_isOutOfStock)
                     Positioned(
-                      top: 10, left: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: _getBadgeColor(product.badgeText),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.15),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          product.badgeText!.toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
+                      top: 10,
+                      left: 10,
+                      child: _buildOutOfStockBadge(),
+                    )
+                  else if (hasBadge)
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: _buildBadge(product.badgeText!),
                     ),
 
-                  // Wishlist button
-                  Positioned(
-                    top: 8, right: 8,
-                    child: GestureDetector(
-                      onTap: () =>
-                          setState(() => _isWishlisted = !_isWishlisted),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: _isWishlisted
-                              ? Colors.red.shade50
-                              : Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.12),
-                              blurRadius: 8,
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          _isWishlisted ? Iconsax.heart5 : Iconsax.heart,
-                          size: 16,
-                          color: _isWishlisted
-                              ? Colors.red
-                              : Colors.grey.shade500,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Sale % badge (top right if on sale)
-                  if (onSale)
+                  // ── Wishlist ──
+                  if (widget.showFavorite)
                     Positioned(
-                      bottom: 8, left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '-${(((product.originalPrice - product.salePrice!) / product.originalPrice) * 100).toStringAsFixed(0)}%',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
+                      top: 8,
+                      right: 8,
+                      child: _buildFavoriteButton(),
+                    ),
+
+                  // ✅ Discount % — bottom left (only if on sale & in stock)
+                  if (_onSale && !_isOutOfStock)
+                    Positioned(
+                      bottom: 8,
+                      left: 8,
+                      child: _buildDiscountBadge(),
                     ),
                 ],
               ),
             ),
 
-            // ── Info section ──
+            // ── Name + Price ──
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Product name
                   Text(
                     product.name,
                     style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: Color(0xFF1F2937),
-                      height: 1.3,
-                    ),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: Color(0xFF1F2937),
+                        height: 1.3),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-
                   const SizedBox(height: 8),
-
-                  // Price row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // ── Aapka existing price logic — same ──
-                            if (onSale) ...[
-                              Text(
-                                '\$${product.originalPrice.toStringAsFixed(0)}',
-                                style: TextStyle(
-                                  decoration: TextDecoration.lineThrough,
-                                  color: Colors.grey.shade400,
-                                  fontSize: 11,
-                                ),
-                              ),
-                              Text(
-                                '\$${product.salePrice!.toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 15,
-                                  color: Colors.red,
-                                ),
-                              ),
-                            ] else
-                              Text(
-                                '\$${product.originalPrice.toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 15,
-                                  color: Color(0xFF6C63FF),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-
-                      // Cart button
-                      Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6C63FF),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Iconsax.shopping_cart,
-                          size: 15,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
+                  _buildPriceRow(isList: false),
                 ],
               ),
             ),
@@ -323,13 +219,9 @@ class _ProductCardState extends State<ProductCard>
     );
   }
 
-  // ════════════════════════════════════════════════════════════
-  // LIST TILE (isCompact: true) — Search results list view
-  // ════════════════════════════════════════════════════════════
+  // ─── List Tile ───────────────────────────────────────────────
   Widget _buildListTile() {
     final product = widget.product;
-    final bool onSale =
-        product.salePrice != null && product.salePrice! > 0;
     final bool hasBadge =
         product.badgeText != null && product.badgeText!.isNotEmpty;
 
@@ -340,10 +232,9 @@ class _ProductCardState extends State<ProductCard>
         border: Border.all(color: Colors.grey.shade100),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 3)),
         ],
       ),
       child: ClipRRect(
@@ -354,52 +245,40 @@ class _ProductCardState extends State<ProductCard>
             Stack(
               children: [
                 Container(
-                  width: 110, height: 110,
+                  width: 110,
+                  height: 110,
                   color: Colors.grey.shade50,
                   child: Image.network(
                     product.imageUrl,
                     fit: BoxFit.cover,
-                    loadingBuilder: (_, child, progress) {
-                      if (progress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: const Color(0xFF6C63FF),
-                          value: progress.expectedTotalBytes != null
-                              ? progress.cumulativeBytesLoaded /
-                                  progress.expectedTotalBytes!
-                              : null,
-                        ),
-                      );
-                    },
                     errorBuilder: (_, __, ___) => Container(
                       color: Colors.grey.shade100,
                       child: Center(
-                        child: Icon(Iconsax.image,
-                            color: Colors.grey.shade400, size: 28),
-                      ),
+                          child: Icon(Iconsax.image,
+                              color: Colors.grey.shade400, size: 28)),
                     ),
                   ),
                 ),
-                if (hasBadge)
+                // ✅ OUT OF STOCK > Badge
+                if (_isOutOfStock)
                   Positioned(
-                    top: 7, left: 7,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: _getBadgeColor(product.badgeText),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        product.badgeText!.toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
+                    top: 7,
+                    left: 7,
+                    child: _buildOutOfStockBadge(small: true),
+                  )
+                else if (hasBadge)
+                  Positioned(
+                    top: 7,
+                    left: 7,
+                    child: _buildBadge(product.badgeText!, small: true),
+                  ),
+
+                // ✅ Discount badge
+                if (_onSale && !_isOutOfStock)
+                  Positioned(
+                    bottom: 6,
+                    left: 6,
+                    child: _buildDiscountBadge(small: true),
                   ),
               ],
             ),
@@ -407,128 +286,202 @@ class _ProductCardState extends State<ProductCard>
             // ── Details ──
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       product.name,
                       style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: Color(0xFF1F2937),
-                        height: 1.3,
-                      ),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: Color(0xFF1F2937),
+                          height: 1.3),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 8),
-
-                    // Price
-                    if (onSale) ...[
-                      Text(
-                        '\$${product.originalPrice.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          decoration: TextDecoration.lineThrough,
-                          color: Colors.grey.shade400,
-                          fontSize: 11,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Text(
-                            '\$${product.salePrice!.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                              color: Colors.red,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                  color: Colors.red.shade100),
-                            ),
-                            child: Text(
-                              'SALE',
-                              style: TextStyle(
-                                color: Colors.red.shade700,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ] else
-                      Text(
-                        '\$${product.originalPrice.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: Color(0xFF6C63FF),
-                        ),
-                      ),
+                    _buildPriceRow(isList: true),
                   ],
                 ),
               ),
             ),
 
-            // ── Actions ──
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Wishlist
-                  GestureDetector(
-                    onTap: () =>
-                        setState(() => _isWishlisted = !_isWishlisted),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: _isWishlisted
-                            ? Colors.red.shade50
-                            : Colors.grey.shade100,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _isWishlisted ? Iconsax.heart5 : Iconsax.heart,
-                        size: 16,
-                        color: _isWishlisted
-                            ? Colors.red
-                            : Colors.grey.shade500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  // Cart
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6C63FF),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Iconsax.shopping_cart,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
+            if (widget.showQuickAdd)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: _buildQuickAddButton(),
               ),
-            ),
           ],
         ),
       ),
+    );
+  }
+
+  // ─── Badge Widgets ───────────────────────────────────────────
+
+  // ✅ OUT OF STOCK badge
+  Widget _buildOutOfStockBadge({bool small = false}) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+          horizontal: small ? 7 : 12, vertical: small ? 3 : 6),
+      decoration: BoxDecoration(
+        color: Colors.red.shade700,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.red.withOpacity(0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Text(
+        'OUT OF STOCK',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: small ? 7 : 9,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  // ✅ Discount % badge
+  Widget _buildDiscountBadge({bool small = false}) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+          horizontal: small ? 6 : 7, vertical: small ? 2 : 3),
+      decoration: BoxDecoration(
+        color: Colors.red,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.red.withOpacity(0.3),
+              blurRadius: 4,
+              offset: const Offset(0, 2))
+        ],
+      ),
+      child: Text(
+        '-$_discountPercent%',
+        style: TextStyle(
+            color: Colors.white,
+            fontSize: small ? 9 : 10,
+            fontWeight: FontWeight.w800),
+      ),
+    );
+  }
+
+  // ✅ Text badge (NEW / COMING SOON / SALE / HOT)
+  Widget _buildBadge(String text, {bool small = false}) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+          horizontal: small ? 7 : 10, vertical: small ? 3 : 5),
+      decoration: BoxDecoration(
+        color: _getBadgeColor(text),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 6,
+              offset: const Offset(0, 2))
+        ],
+      ),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+            color: Colors.white,
+            fontSize: small ? 8 : 9,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.5),
+      ),
+    );
+  }
+
+  // ✅ Wishlist button
+  Widget _buildFavoriteButton() {
+    return GestureDetector(
+      onTap: () => setState(() => _isWishlisted = !_isWishlisted),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: _isWishlisted ? Colors.red.shade50 : Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.12), blurRadius: 8)
+          ],
+        ),
+        child: Icon(
+          _isWishlisted ? Iconsax.heart5 : Iconsax.heart,
+          size: 16,
+          color: _isWishlisted ? Colors.red : Colors.grey.shade500,
+        ),
+      ),
+    );
+  }
+
+  // ✅ Price row — sale strikethrough + red bold
+  Widget _buildPriceRow({required bool isList}) {
+    final product = widget.product;
+    const Color primaryColor = Color(0xFF6C63FF);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_onSale) ...[
+                Text(
+                  'PKR ${product.price.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    decoration: TextDecoration.lineThrough,
+                    decorationColor: Colors.grey.shade400,
+                    color: Colors.grey.shade400,
+                    fontSize: isList ? 11 : 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'PKR ${product.salePrice!.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: isList ? 17 : 15,
+                    color: Colors.red.shade600,
+                  ),
+                ),
+              ] else
+                Text(
+                  'PKR ${product.price.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: isList ? 17 : 15,
+                    color: primaryColor,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (!isList && widget.showQuickAdd) _buildQuickAddButton(),
+      ],
+    );
+  }
+
+  // ✅ Cart button
+  Widget _buildQuickAddButton() {
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF6C63FF),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Icon(Iconsax.shopping_cart, size: 15, color: Colors.white),
     );
   }
 }

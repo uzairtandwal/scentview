@@ -18,7 +18,7 @@ class OrderItem {
   factory OrderItem.fromProduct(Product p, {int quantity = 1}) => OrderItem(
     id: p.id,
     name: p.name,
-    price: p.originalPrice,
+    price: p.price,
     quantity: quantity,
     imageUrl: p.imageUrl,
   );

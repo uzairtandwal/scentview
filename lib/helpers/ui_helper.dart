@@ -5,7 +5,7 @@ Color getBadgeColor(String? badgeText) {
     return Colors.transparent;
   }
   final text = badgeText.toLowerCase();
-  if (text.contains('sold') || text.contains('stock')) {
+  if (text.contains('sold') || text.contains('quantity')) {
     return Colors.grey;
   }
   if (text.contains('new')) {

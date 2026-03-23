@@ -11,17 +11,21 @@ import '../search_results_screen.dart';
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showSearch;
   final String? hintText;
-  final bool showLogo;
   final VoidCallback? onMenuTap;
+  final VoidCallback? onRefresh;
   final Function(String)? onSearchChanged;
+  final List<Color>? gradientColors;
+  final Color? iconColor;
 
   const CustomAppBar({
     super.key,
     this.showSearch = true,
     this.hintText,
-    this.showLogo = true,
     this.onMenuTap,
+    this.onRefresh,
     this.onSearchChanged,
+    this.gradientColors,
+    this.iconColor,
   });
 
   @override
@@ -31,7 +35,13 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
-    final onPrimary = theme.colorScheme.onPrimary;
+    final onPrimary = iconColor ?? theme.colorScheme.onPrimary;
+
+    final List<Color> colors = gradientColors ??
+        [
+          primary,
+          Color.lerp(primary, Colors.black, 0.15) ?? primary,
+        ];
 
     // ✅ Status bar icons white on gradient
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -39,16 +49,13 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              primary,
-              Color.lerp(primary, Colors.black, 0.15) ?? primary,
-            ],
+            colors: colors,
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           boxShadow: [
             BoxShadow(
-              color: primary.withValues(alpha: 0.35),
+              color: colors.first.withValues(alpha: 0.35),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -63,23 +70,22 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               child: Row(
                 children: [
                   // ── 1. MENU BUTTON ──────────────────────────────
-                  _AppBarButton(
-                    icon: Icons.menu_rounded,
-                    iconColor: onPrimary,
-                    onTap: onMenuTap ?? () => Scaffold.of(context).openDrawer(),
+                  Builder(
+                    builder: (menuContext) => _AppBarButton(
+                      icon: Icons.menu_rounded,
+                      iconColor: onPrimary,
+                      onTap: onMenuTap ?? () => Scaffold.of(menuContext).openDrawer(),
+                    ),
                   ),
 
-                  // ── 2. LOGO ─────────────────────────────────────
-                  if (showLogo) ...[
-                    const SizedBox(width: 6),
-                    AppLogo(
-                      size: 36,
-                      backgroundColor: onPrimary.withValues(alpha: 0.15),
-                      tintColor: onPrimary,
-                      padding: const EdgeInsets.all(6),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ],
+                  const SizedBox(width: 6),
+
+                  // ── 2. REFRESH BUTTON ───────────────────────────
+                  _AppBarButton(
+                    icon: Icons.refresh_rounded,
+                    iconColor: onPrimary,
+                    onTap: onRefresh,
+                  ),
 
                   const SizedBox(width: 8),
 
@@ -160,30 +166,32 @@ class _SearchBar extends StatelessWidget {
           ),
         ],
       ),
-      child: TextField(
-        onChanged: onChanged,
-        onSubmitted: onSubmitted,
-        textAlignVertical: TextAlignVertical.center,
-        style: const TextStyle(
-          fontSize: 14,
-          color: Colors.black87,
-          fontWeight: FontWeight.w400,
-        ),
-        decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: TextStyle(
-            color: Colors.grey.shade500,
-            fontSize: 13,
+      child: Center(
+        child: TextField(
+          onChanged: onChanged,
+          onSubmitted: onSubmitted,
+          textAlignVertical: TextAlignVertical.center,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.black87,
             fontWeight: FontWeight.w400,
           ),
-          border: InputBorder.none,
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: primary,
-            size: 18,
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
+            ),
+            border: InputBorder.none,
+            prefixIcon: Icon(
+              Icons.search_rounded,
+              color: primary,
+              size: 18,
+            ),
+            isDense: true,
+            contentPadding: const EdgeInsets.only(top: 0), // Fix alignment
           ),
-          isDense: true,
-          contentPadding: EdgeInsets.zero,
         ),
       ),
     );

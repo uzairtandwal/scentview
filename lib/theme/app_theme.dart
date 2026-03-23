@@ -42,8 +42,8 @@ class AppTheme {
   static const Color bestsellerBadgeColor = Color(0xFF3B82F6); // Blue for BEST SELLER
   static const Color limitedBadgeColor = Color(0xFF8B5CF6); // Purple for LIMITED
   
-  static const Color stockWarningColor = Color(0xFFF59E0B); // Orange for low stock
-  static const Color outOfStockColor = Color(0xFFEF4444);  // Red for out of stock
+  static const Color quantityWarningColor = Color(0xFFF59E0B); // Orange for low quantity
+  static const Color outOfquantityColor = Color(0xFFEF4444);  // Red for Out of Stock
   
   // ================ GRADIENTS ================
   static LinearGradient get primaryGradient => const LinearGradient(
@@ -236,13 +236,13 @@ class AppTheme {
     color: primaryColor,
   );
   
-  static TextStyle get productSalePrice => GoogleFonts.inter(
+  static TextStyle get productnull => GoogleFonts.inter(
     fontSize: 20, 
     fontWeight: FontWeight.w800,
     color: saleBadgeColor,
   );
   
-  static TextStyle get productOriginalPrice => GoogleFonts.inter(
+  static TextStyle get productprice => GoogleFonts.inter(
     fontSize: 14,
     fontWeight: FontWeight.w500,
     color: textTertiary,
@@ -256,14 +256,14 @@ class AppTheme {
     letterSpacing: 0.8,
   );
   
-  static TextStyle get stockWarningText => GoogleFonts.inter(
+  static TextStyle get quantityWarningText => GoogleFonts.inter(
     fontSize: 11,
     fontWeight: FontWeight.w700,
-    color: stockWarningColor,
+    color: quantityWarningColor,
     letterSpacing: 0.3,
   );
   
-  static TextStyle get outOfStockText => GoogleFonts.inter(
+  static TextStyle get outOfquantityText => GoogleFonts.inter(
     fontSize: 11,
     fontWeight: FontWeight.w700,
     color: Colors.white,

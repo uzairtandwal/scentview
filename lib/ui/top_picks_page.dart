@@ -67,22 +67,22 @@ class _TopPicksPageState extends State<TopPicksPage> {
   List<Product> get _displayed {
     var list = _allProducts.where((p) {
       final matchCat = _selectedCategory == 'All' ||
-          p.category?.name == _selectedCategory;
+          p.category == _selectedCategory;
       final matchPrice =
-          (p.salePrice ?? p.originalPrice) <= _maxPrice;
+          (p.price) <= _maxPrice;
       return matchCat && matchPrice;
     }).toList();
 
     switch (_sortBy) {
       case 'Price: Low to High':
         list.sort((a, b) =>
-            (a.salePrice ?? a.originalPrice)
-                .compareTo(b.salePrice ?? b.originalPrice));
+            (a.price)
+                .compareTo(b.price));
         break;
       case 'Price: High to Low':
         list.sort((a, b) =>
-            (b.salePrice ?? b.originalPrice)
-                .compareTo(a.salePrice ?? a.originalPrice));
+            (b.price)
+                .compareTo(a.price));
         break;
       case 'Name A-Z':
         list.sort((a, b) => a.name.compareTo(b.name));

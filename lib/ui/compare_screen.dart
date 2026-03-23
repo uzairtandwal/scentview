@@ -70,7 +70,7 @@ class _CompareBody extends StatelessWidget {
 
     // Pre-compute prices for highlight logic
     final prices = items
-        .map((p) => (p.salePrice ?? p.originalPrice) as double)
+        .map((p) => (p.price) as double)
         .toList();
     final minPrice = prices.reduce((a, b) => a < b ? a : b);
 
@@ -91,8 +91,9 @@ class _CompareBody extends StatelessWidget {
                 label: 'Price',
                 values: items
                     .map((p) =>
-                        'PKR ${(p.salePrice ?? p.originalPrice).toStringAsFixed(0)}')
-                    .toList(),
+                        'PKR ${(p.price).toStringAsFixed(0)}')
+                    .toList()
+                    .cast<String>(),
                 // Highlight lowest price index
                 highlightIndex: prices.indexOf(minPrice),
                 highlightGood: true,
@@ -100,10 +101,11 @@ class _CompareBody extends StatelessWidget {
               _CompareRowData(
                 label: 'On Sale',
                 values: items
-                    .map((p) => p.salePrice != null ? '✓ Yes' : '✗ No')
-                    .toList(),
+                    .map((p) => false ? '✓ Yes' : '✗ No')
+                    .toList()
+                    .cast<String>(),
                 highlightIndex: items
-                    .indexWhere((p) => p.salePrice != null),
+                    .indexWhere((p) => false),
                 highlightGood: true,
               ),
             ],
@@ -118,25 +120,28 @@ class _CompareBody extends StatelessWidget {
               _CompareRowData(
                 label: 'Category',
                 values: items
-                    .map((p) => p.category?.name ?? 'N/A')
-                    .toList(),
+                    .map((p) => p.category?.toString() ?? 'N/A')
+                    .toList()
+                    .cast<String>(),
               ),
               _CompareRowData(
                 label: 'Badge',
                 values: items
                     .map((p) => p.badgeText ?? '—')
-                    .toList(),
+                    .toList()
+                    .cast<String>(),
               ),
               _CompareRowData(
                 label: 'Availability',
                 values: items.map((p) {
-                  if (p.stock == null) return 'In Stock';
-                  if (p.stock == 0) return 'Out of Stock';
-                  if (p.stock <= 10) return 'Only ${p.stock} left';
+                  final qty = p.quantity;
+                  if (qty == null) return 'In Stock';
+                  if (qty == 0) return 'Out of Stock';
+                  if (qty <= 10) return 'Only $qty left';
                   return 'In Stock';
-                }).toList(),
+                }).toList().cast<String>(),
                 highlightIndex: items.indexWhere((p) =>
-                    p.stock == null || (p.stock != null && p.stock > 0)),
+                    p.quantity == null || p.quantity! > 0),
                 highlightGood: true,
               ),
             ],
@@ -242,7 +247,7 @@ class _ProductHeaders extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'PKR ${(p.salePrice ?? p.originalPrice).toStringAsFixed(0)}',
+                    'PKR ${(p.price).toStringAsFixed(0)}',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,

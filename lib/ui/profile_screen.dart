@@ -305,7 +305,6 @@ Phone: +92 300 1234567
           return CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
-              _buildAppBar(isLoggedIn, user),
               SliverToBoxAdapter(
                 child: FadeTransition(
                   opacity: _fadeAnimation,
@@ -362,93 +361,6 @@ Phone: +92 300 1234567
           );
         },
       ),
-    );
-  }
-
-  // ─── App Bar ──────────────────────────────────────────────────
-  Widget _buildAppBar(bool isLoggedIn, AuthUser? user) {
-    return SliverAppBar(
-      expandedHeight: 180,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      pinned: true,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: _darkModeEnabled
-                  ? [const Color(0xFF1E293B), const Color(0xFF334155)]
-                  : [
-                      const Color(0xFF3B82F6),
-                      const Color(0xFF8B5CF6),
-                      const Color(0xFFEC4899),
-                    ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                top: -50, right: -50,
-                child: Container(
-                  width: 200, height: 200,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.1),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
-        title: Row(
-          children: [
-            Icon(
-              Iconsax.user_octagon5,
-              color: Colors.white, size: 28,
-              shadows: [
-                Shadow(blurRadius: 10, color: Colors.black.withOpacity(0.3))
-              ],
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'My Profile',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                shadows: [
-                  Shadow(
-                      blurRadius: 10,
-                      color: Colors.black.withOpacity(0.2))
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        if (isLoggedIn)
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                      color: Colors.white.withOpacity(0.3), width: 2),
-                ),
-                child: const Icon(Iconsax.edit_25,
-                    size: 20, color: Colors.white),
-              ),
-              onPressed: () => _showEditProfileDialog(context, user),
-            ),
-          ),
-      ],
     );
   }
 

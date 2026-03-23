@@ -16,26 +16,35 @@ class ProductFormScreen extends StatefulWidget {
   @override
   _ProductFormScreenState createState() => _ProductFormScreenState();
 }
-
 class _ProductFormScreenState extends State<ProductFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _apiService = ApiService();
   final _scrollController = ScrollController();
 
+  Future<List<app_category.Category>>? _categoriesFuture;
+
   late TextEditingController _nameController;
+  // ... rest of controllers
+
   late TextEditingController _descriptionController;
-  late TextEditingController _originalPriceController;
+  late TextEditingController _priceController;
   late TextEditingController _salePriceController;
   late TextEditingController _badgeController;
-  late TextEditingController _stockController;
+  late TextEditingController _quantityController;
   late TextEditingController _brandController;
+  late TextEditingController _scentFamilyController;
+  late TextEditingController _sizeController;
+  late TextEditingController _notesTopController;
+  late TextEditingController _notesMiddleController;
+  late TextEditingController _notesBaseController;
   late TextEditingController _skuController;
   
-  String? _selectedCategoryId;
+  String? _selectedCategoryName;
   XFile? _pickedImage;
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
   bool _isFeatured = false;
+  bool _isSlider = false;
   bool _isActive = true;
   bool _hasFreeShipping = false;
   bool _isTaxable = true;
@@ -57,20 +66,32 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   void initState() {
     super.initState();
     _initializeControllers();
+    _categoriesFuture = _apiService.fetchCategories(); // Cache the future
     if (widget.product?.tags != null) {
       _tags = List.from(widget.product!.tags!);
     }
   }
 
-  @override
+  void _reloadCategories() {
+    setState(() {
+      _categoriesFuture = _apiService.fetchCategories();
+    });
+  }
+
+  // ... rest of controllers
+
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
-    _originalPriceController.dispose();
-    _salePriceController.dispose();
+    _priceController.dispose();
     _badgeController.dispose();
-    _stockController.dispose();
+    _quantityController.dispose();
     _brandController.dispose();
+    _scentFamilyController.dispose();
+    _sizeController.dispose();
+    _notesTopController.dispose();
+    _notesMiddleController.dispose();
+    _notesBaseController.dispose();
     _skuController.dispose();
     _tagController.dispose();
     _scrollController.dispose();
@@ -82,22 +103,22 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     
     _nameController = TextEditingController(text: product?.name ?? '');
     _descriptionController = TextEditingController(text: product?.description ?? '');
-    _originalPriceController = TextEditingController(text: product?.originalPrice.toString() ?? '');
-    _salePriceController = TextEditingController(
-      text: (product?.salePrice != null && product!.salePrice! > 0)
-          ? product.salePrice.toString()
-          : ''
-    );
+    _priceController = TextEditingController(text: product?.price.toString() ?? '');
+    _salePriceController = TextEditingController(text: product?.salePrice?.toString() ?? '');
     _badgeController = TextEditingController(text: product?.badgeText ?? '');
-    _stockController = TextEditingController(text: product?.stock?.toString() ?? '100');
+    _quantityController = TextEditingController(text: product?.quantity.toString() ?? '100');
     _brandController = TextEditingController(text: product?.brand ?? '');
+    _scentFamilyController = TextEditingController(text: product?.scentFamily ?? '');
+    _sizeController = TextEditingController(text: product?.size ?? '');
+    _notesTopController = TextEditingController(text: product?.notesTop ?? '');
+    _notesMiddleController = TextEditingController(text: product?.notesMiddle ?? '');
+    _notesBaseController = TextEditingController(text: product?.notesBase ?? '');
     _skuController = TextEditingController(text: product?.sku ?? '');
     
-    _selectedCategoryId = product?.categoryId?.toString();
+    _selectedCategoryName = product?.category;
     _isFeatured = product?.isFeatured ?? false;
+    _isSlider = product?.isSlider ?? false;
     _isActive = product?.isActive ?? true;
-    _hasFreeShipping = product?.hasFreeShipping ?? false;
-    _isTaxable = product?.isTaxable ?? true;
   }
 
   Future<void> _pickImage({bool isMainImage = true}) async {
@@ -172,31 +193,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       return;
     }
 
-    if (_selectedCategoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please select a category'),
-          backgroundColor: Colors.orange.shade600,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+    if (_selectedCategoryName == null) {
+      _showErrorSnackbar('Please select a category');
       return;
     }
 
     if (widget.product == null && _pickedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please upload a main product image'),
-          backgroundColor: Colors.red.shade600,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+      _showErrorSnackbar('Please upload a main product image');
       return;
     }
 
@@ -206,43 +209,57 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       String token = ApiService.authToken ?? "YOUR_TEST_TOKEN";
 
       if (widget.product == null) {
-        // Add new product
         await _apiService.addProduct(
           name: _nameController.text,
           description: _descriptionController.text,
-          price: _originalPriceController.text,
+          price: _priceController.text,
           salePrice: _salePriceController.text,
-          categoryId: _selectedCategoryId!,
+          category: _selectedCategoryName!,
           isFeatured: _isFeatured,
+          isSlider: _isSlider,
+          scentFamily: _scentFamilyController.text,
+          brand: _brandController.text,
+          size: _sizeController.text,
+          quantity: _quantityController.text,
+          notesTop: _notesTopController.text,
+          notesMiddle: _notesMiddleController.text,
+          notesBase: _notesBaseController.text,
           badgeText: _badgeController.text,
-          stock: _stockController.text, // <-- FIX: Sending Stock
           imageFile: _pickedImage,
           token: token,
         );
         
-        _showSuccessSnackbar('Product added successfully!');
+        if (mounted) {
+          await _showSuccessDialog('Product Created!', 'New fragrance has been added to your inventory.');
+        }
       } else {
-        // Update existing product
         await _apiService.updateProduct(
           id: widget.product!.id.toString(),
           name: _nameController.text,
           description: _descriptionController.text,
-          price: _originalPriceController.text,
-          salePrice: _salePriceController.text,
-          categoryId: _selectedCategoryId!,
+          price: _priceController.text,
+          category: _selectedCategoryName!,
           isFeatured: _isFeatured,
+          isSlider: _isSlider,
+          scentFamily: _scentFamilyController.text,
+          brand: _brandController.text,
+          size: _sizeController.text,
+          quantity: _quantityController.text,
+          notesTop: _notesTopController.text,
+          notesMiddle: _notesMiddleController.text,
+          notesBase: _notesBaseController.text,
           badgeText: _badgeController.text,
-          stock: _stockController.text, // <-- FIX: Sending Stock
           imageFile: _pickedImage,
-          existingImageUrl: _pickedImage == null ? widget.product!.imageUrl : null,
           token: token,
         );
         
-        _showSuccessSnackbar('Product updated successfully!');
+        if (mounted) {
+          await _showSuccessDialog('Product Updated!', 'Changes have been saved successfully.');
+        }
       }
 
       if (widget.onSave != null) widget.onSave!();
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
     } catch (e) {
       debugPrint("Error: $e");
       _showErrorSnackbar('Error: ${e.toString()}');
@@ -253,22 +270,26 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     }
   }
 
-  void _showSuccessSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
+  Future<void> _showSuccessDialog(String title, String message) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.green.shade400, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text(message)),
+            const Icon(Icons.check_circle, color: Colors.green, size: 28),
+            const SizedBox(width: 12),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        duration: const Duration(seconds: 3),
+        content: Text(message, style: const TextStyle(fontSize: 15)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -410,10 +431,53 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           ),
                           
                           SizedBox(height: _fieldSpacing),
+
+                          _buildTextField(
+                            controller: _scentFamilyController,
+                            label: 'Scent Family',
+                            hintText: 'e.g., Floral, Woody, Oriental',
+                          ),
+                          
+                          SizedBox(height: _fieldSpacing),
+
+                          _buildTextField(
+                            controller: _sizeController,
+                            label: 'Size',
+                            hintText: 'e.g., 50ml, 100ml',
+                          ),
+                          
+                          SizedBox(height: _sectionSpacing),
+
+                          _buildSectionTitle('Fragrance Notes'),
+                          SizedBox(height: _fieldSpacing),
+
+                          _buildTextField(
+                            controller: _notesTopController,
+                            label: 'Top Notes',
+                            hintText: 'e.g., Bergamot, Lemon',
+                          ),
+                          
+                          SizedBox(height: _fieldSpacing),
+
+                          _buildTextField(
+                            controller: _notesMiddleController,
+                            label: 'Middle Notes',
+                            hintText: 'e.g., Rose, Jasmine',
+                          ),
+                          
+                          SizedBox(height: _fieldSpacing),
+
+                          _buildTextField(
+                            controller: _notesBaseController,
+                            label: 'Base Notes',
+                            hintText: 'e.g., Vanilla, Musk',
+                          ),
+                          
+                          SizedBox(height: _fieldSpacing),
                           
                           _buildTextField(
                             controller: _skuController,
-                            label: 'SKU (Stock Keeping Unit)',
+                            label: 'SKU (quantity Keeping Unit)',
                             hintText: 'Enter product SKU',
                           ),
                           
@@ -686,7 +750,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   // ================ CATEGORY DROPDOWN ================
   Widget _buildCategoryDropdown() {
     return FutureBuilder<List<app_category.Category>>(
-      future: _apiService.fetchCategories(),
+      future: _categoriesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
@@ -717,30 +781,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           );
         }
 
-        if (snapshot.hasError) {
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.red.shade100),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.error_outline, color: Colors.red.shade600, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Failed to load categories',
-                    style: TextStyle(color: Colors.red.shade800),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
           return Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -750,12 +791,23 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             ),
             child: Row(
               children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 20),
+                Icon(Icons.warning_amber_rounded,
+                    color: Colors.orange.shade700, size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'No categories found. Please create categories first.',
+                    snapshot.hasError
+                        ? 'Failed to load categories'
+                        : 'No categories found',
                     style: TextStyle(color: Colors.orange.shade800),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _reloadCategories,
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Retry'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.orange.shade900,
                   ),
                 ),
               ],
@@ -766,46 +818,60 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         final categories = snapshot.data!;
 
         // Ensure selected category exists
-        if (_selectedCategoryId != null) {
-          final exists = categories.any((c) => c.id.toString() == _selectedCategoryId);
-          if (!exists) _selectedCategoryId = null;
+        if (_selectedCategoryName != null) {
+          final exists = categories.any((c) => c.name == _selectedCategoryName);
+          if (!exists) _selectedCategoryName = null;
         }
 
-        return DropdownButtonFormField<String>(
-          value: _selectedCategoryId,
-          decoration: InputDecoration(
-            labelText: 'Category *',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            filled: true,
-            fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
-          ),
-          items: categories.map((category) {
-            return DropdownMenuItem<String>(
-              value: category.id,
-              child: Text(
-                category.name,
-                style: TextStyle(fontSize: _isMobile ? 15 : 16),
+        return Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _selectedCategoryName,
+                decoration: InputDecoration(
+                  labelText: 'Category *',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor:
+                      Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                ),
+                items: categories.map((category) {
+                  return DropdownMenuItem<String>(
+                    value: category.name,
+                    child: Text(
+                      category.name,
+                      style: TextStyle(fontSize: _isMobile ? 15 : 16),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedCategoryName = value;
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please select a category';
+                  }
+                  return null;
+                },
+                icon: Icon(
+                  Icons.arrow_drop_down_rounded,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                ),
+                borderRadius: BorderRadius.circular(12),
               ),
-            );
-          }).toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedCategoryId = value;
-            });
-          },
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please select a category';
-            }
-            return null;
-          },
-          icon: Icon(
-            Icons.arrow_drop_down_rounded,
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-          ),
-          borderRadius: BorderRadius.circular(12),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: _reloadCategories,
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh Categories',
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ],
         );
       },
     );
@@ -815,120 +881,58 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   Widget _buildPricingSection() {
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildTextField(
-                controller: _originalPriceController,
-                label: 'Regular Price *',
-                hintText: '0.00',
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Price is required';
-                  }
-                  final price = double.tryParse(value);
-                  if (price == null || price <= 0) {
-                    return 'Enter a valid price';
-                  }
-                  return null;
-                },
-              ),
-            ),
-            SizedBox(width: _fieldSpacing),
-            Expanded(
-              child: _buildTextField(
-                controller: _salePriceController,
-                label: 'Sale Price',
-                hintText: '0.00 (optional)',
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value != null && value.isNotEmpty) {
-                    final price = double.tryParse(value);
-                    if (price == null || price <= 0) {
-                      return 'Enter a valid price';
-                    }
-                    final regularPrice = double.tryParse(_originalPriceController.text);
-                    if (regularPrice != null && price >= regularPrice) {
-                      return 'Sale price must be less than regular price';
-                    }
-                  }
-                  return null;
-                },
-              ),
-            ),
-          ],
+        _buildTextField(
+          controller: _priceController,
+          label: 'Regular Price *',
+          hintText: '0.00',
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Price is required';
+            }
+            final price = double.tryParse(value);
+            if (price == null || price <= 0) {
+              return 'Enter a valid price';
+            }
+            return null;
+          },
         ),
-        
         SizedBox(height: _fieldSpacing),
-        
-        // Price Comparison
-        if (_originalPriceController.text.isNotEmpty && _salePriceController.text.isNotEmpty)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green.shade100),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Discount:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                Text(
-                  _calculateDiscount(),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: Colors.green.shade700,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        _buildTextField(
+          controller: _salePriceController,
+          label: 'Sale Price (Optional)',
+          hintText: '0.00',
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          validator: (value) {
+            if (value != null && value.isNotEmpty) {
+              final price = double.tryParse(value);
+              if (price == null || price <= 0) {
+                return 'Enter a valid sale price';
+              }
+            }
+            return null;
+          },
+        ),
       ],
     );
   }
 
-  String _calculateDiscount() {
-    try {
-      final regularPrice = double.parse(_originalPriceController.text);
-      final salePrice = double.parse(_salePriceController.text);
-      final discount = ((regularPrice - salePrice) / regularPrice * 100);
-      return '${discount.toStringAsFixed(1)}% OFF';
-    } catch (e) {
-      return 'Invalid prices';
-    }
-  }
-
   // ================ INVENTORY SECTION ================
   Widget _buildInventorySection() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildTextField(
-            controller: _stockController,
-            label: 'Stock Quantity',
-            hintText: '100',
-            keyboardType: TextInputType.number,
-            validator: (value) {
-              if (value != null && value.isNotEmpty) {
-                final stock = int.tryParse(value);
-                if (stock == null || stock < 0) {
-                  return 'Enter valid stock quantity';
-                }
-              }
-              return null;
-            },
-          ),
-        ),
-      ],
+    return _buildTextField(
+      controller: _quantityController,
+      label: 'Quantity',
+      hintText: '100',
+      keyboardType: TextInputType.number,
+      validator: (value) {
+        if (value != null && value.isNotEmpty) {
+          final q = int.tryParse(value);
+          if (q == null || q < 0) {
+            return 'Enter valid quantity';
+          }
+        }
+        return null;
+      },
     );
   }
 
@@ -1027,6 +1031,32 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             ),
             value: _isFeatured,
             onChanged: (value) => setState(() => _isFeatured = value),
+            activeColor: Theme.of(context).colorScheme.primary,
+          ),
+          
+          Divider(
+            color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+            height: 20,
+          ),
+
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              'Show in Sale Popup',
+              style: TextStyle(
+                fontSize: _isMobile ? 15 : 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            subtitle: Text(
+              'Display this product in the hot sale popup',
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+            value: _isSlider,
+            onChanged: (value) => setState(() => _isSlider = value),
             activeColor: Theme.of(context).colorScheme.primary,
           ),
           

@@ -458,13 +458,13 @@ class _ProductListScreenState extends State<ProductListScreen> {
                             DataCell(
                               SizedBox(
                                 width: 120,
-                                child: product.salePrice != null && product.salePrice! > 0
+                                child: false
                                     ? Column(
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            'PKR ${product.salePrice!.toStringAsFixed(0)}',
+                                            'PKR ${product.price.toStringAsFixed(0)}',
                                             style: const TextStyle(
                                               color: Colors.red,
                                               fontWeight: FontWeight.w700,
@@ -473,7 +473,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            'PKR ${product.originalPrice.toStringAsFixed(0)}',
+                                            'PKR ${product.price.toStringAsFixed(0)}',
                                             style: TextStyle(
                                               decoration: TextDecoration.lineThrough,
                                               fontSize: 12,
@@ -483,7 +483,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                                         ],
                                       )
                                     : Text(
-                                        'PKR ${product.originalPrice.toStringAsFixed(0)}',
+                                        'PKR ${product.price.toStringAsFixed(0)}',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: 15,
@@ -654,12 +654,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        if (product.salePrice != null && product.salePrice! > 0)
+                        if (false)
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'PKR ${product.salePrice!.toStringAsFixed(0)}',
+                                'PKR ${product.price.toStringAsFixed(0)}',
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
@@ -667,7 +667,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                                 ),
                               ),
                               Text(
-                                'PKR ${product.originalPrice.toStringAsFixed(0)}',
+                                'PKR ${product.price.toStringAsFixed(0)}',
                                 style: TextStyle(
                                   fontSize: 14,
                                   decoration: TextDecoration.lineThrough,
@@ -678,7 +678,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           )
                         else
                           Text(
-                            'PKR ${product.originalPrice.toStringAsFixed(0)}',
+                            'PKR ${product.price.toStringAsFixed(0)}',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,

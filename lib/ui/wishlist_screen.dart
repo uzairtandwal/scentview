@@ -16,7 +16,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
       'brand': 'Creed',
       'price': 'PKR 45,000',
       'size': '100ml',
-      'inStock': true,
+      'inquantity': true,
       'discount': null,
     },
     {
@@ -24,7 +24,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
       'brand': 'Maison Margiela',
       'price': 'PKR 22,000',
       'size': '100ml',
-      'inStock': true,
+      'inquantity': true,
       'discount': '10%',
     },
     {
@@ -32,7 +32,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
       'brand': 'Amouage',
       'price': 'PKR 38,000',
       'size': '100ml',
-      'inStock': false,
+      'inquantity': false,
       'discount': null,
     },
     {
@@ -40,7 +40,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
       'brand': 'Byredo',
       'price': 'PKR 28,500',
       'size': '50ml',
-      'inStock': true,
+      'inquantity': true,
       'discount': null,
     },
     {
@@ -48,7 +48,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
       'brand': 'Le Labo',
       'price': 'PKR 32,000',
       'size': '100ml',
-      'inStock': true,
+      'inquantity': true,
       'discount': '5%',
     },
   ];
@@ -97,6 +97,28 @@ class _WishlistScreenState extends State<WishlistScreen> {
               ),
               onPressed: () => Navigator.pop(context),
             ),
+            actions: [
+              // Refresh button
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Iconsax.refresh, color: Colors.white, size: 18),
+                  ),
+                  onPressed: () {
+                    setState(() {});
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Wishlist Refreshed'), duration: Duration(seconds: 1)),
+                    );
+                  },
+                ),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: BoxDecoration(
@@ -227,7 +249,7 @@ class _WishlistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary  = theme.colorScheme.primary;
-    final inStock  = item['inStock'] as bool;
+    final inquantity  = item['inquantity'] as bool;
     final discount = item['discount'] as String?;
 
     return Container(
@@ -311,8 +333,8 @@ class _WishlistCard extends StatelessWidget {
                   ),
                 ),
 
-              // Out of stock overlay
-              if (!inStock)
+              // Out of Stock overlay
+              if (!inquantity)
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
@@ -414,10 +436,10 @@ class _WishlistCard extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: inStock ? onAddToCart : null,
+                      onPressed: inquantity ? onAddToCart : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor:
-                            inStock ? primary : null,
+                            inquantity ? primary : null,
                         disabledBackgroundColor:
                             theme.colorScheme.surfaceContainerHighest,
                         foregroundColor: Colors.white,
@@ -433,7 +455,7 @@ class _WishlistCard extends StatelessWidget {
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       child: Text(
-                        inStock ? 'Add to Cart' : 'Notify Me',
+                        inquantity ? 'Add to Cart' : 'Notify Me',
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,

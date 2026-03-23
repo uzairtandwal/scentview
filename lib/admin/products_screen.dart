@@ -75,7 +75,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
           : products.where((product) {
               return product.name.toLowerCase().contains(query.toLowerCase()) ||
                   (product.description?.toLowerCase().contains(query.toLowerCase()) ?? false) ||
-                  (product.category?.name.toLowerCase().contains(query.toLowerCase()) ?? false);
+                  (product.category?.toLowerCase().contains(query.toLowerCase()) ?? false);
             }).toList();
     });
   }
@@ -712,18 +712,18 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 children: [
                   const SizedBox(height: 4),
                   Text(
-                    '\$${product.originalPrice.toStringAsFixed(2)}',
+                    '\$${product.price.toStringAsFixed(2)}',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
                       color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
-                  if (product.category?.name.isNotEmpty == true)
+                  if (product.category?.isNotEmpty == true)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        product.category!.name,
+                        product.category!,
                         style: TextStyle(
                           fontSize: 12,
                           color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
@@ -963,7 +963,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  '\$${product.originalPrice.toStringAsFixed(2)}',
+                                  '\$${product.price.toStringAsFixed(2)}',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 16,
@@ -995,9 +995,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                             ),
                             
                             // Category
-                            if (product.category?.name.isNotEmpty == true)
+                            if (product.category?.isNotEmpty == true)
                               Text(
-                                product.category!.name,
+                                product.category!,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),

@@ -27,7 +27,7 @@ class _ScentViewNeonSplashState extends State<ScentViewNeonSplash> with TickerPr
     );
 
     // ✅ FIXED: Ye block ab 4 second baad onFinished ko call karega
-    Future.delayed(const Duration(seconds: 4), () {
+    Future.delayed(const Duration(seconds: 2), () {
       if (mounted && widget.onFinished != null) {
         widget.onFinished!(); 
       }

@@ -2,13 +2,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart'; 
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // ✅ Added
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart'; 
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:scentview/services/auth_service.dart';
 import 'package:scentview/services/orders_service.dart'; 
 import 'package:scentview/services/cart_service.dart';
+import 'package:scentview/services/compare_service.dart'; // ✅ Added
 import 'firebase_options.dart';
 import 'app.dart';
 
@@ -38,8 +39,9 @@ void main() async {
           ChangeNotifierProvider(create: (_) => AuthService()),
           ChangeNotifierProvider(create: (_) => OrdersService()),
           ChangeNotifierProvider(create: (_) => CartService()),
+          ChangeNotifierProvider(create: (_) => CompareService()), // ✅ Added
         ],
-        child: ScentViewApp(),
+        child: const ScentViewApp(),
       ),
     );
 

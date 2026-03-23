@@ -25,12 +25,22 @@ class ProductCard extends StatelessWidget {
     this.isFavorite = false,
   });
 
-  bool get _isOutOfStock => product.stock != null && product.stock! == 0;
-  bool get _isLowStock =>
-      product.stock != null && product.stock! > 0 && product.stock! <= 10;
-  bool get _onSale => product.salePrice != null && product.salePrice! > 0;
+  bool get _isOutOfquantity => product.quantity == 0;
+  bool get _isLowquantity =>
+      product.quantity > 0 && product.quantity <= 10;
+  
+  bool get _onSale =>
+      product.salePrice != null &&
+      product.salePrice! > 0 &&
+      product.salePrice! < product.price;
+
+  int get _discountPercent {
+    if (!_onSale) return 0;
+    return (((product.price - product.salePrice!) / product.price) * 100).round();
+  }
+
   bool get _hasBadge =>
-      product.badgeText != null && product.badgeText!.isNotEmpty;
+      (product.badgeText != null && product.badgeText!.isNotEmpty) || _onSale;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +53,7 @@ class ProductCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: _isOutOfStock ? null : onTap, // ✅ Connectivity check parent karein
+        onTap: _isOutOfquantity ? null : onTap,
         borderRadius: BorderRadius.circular(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,13 +63,14 @@ class ProductCard extends StatelessWidget {
               flex: isCompact ? 6 : 7,
               child: _ImageSection(
                 imageUrl: imageUrl,
-                isOutOfStock: _isOutOfStock,
+                isOutOfquantity: _isOutOfquantity,
                 hasBadge: _hasBadge,
-                badgeText: product.badgeText,
+                badgeText: _onSale ? '${_discountPercent}% OFF' : product.badgeText,
+                isSaleBadge: _onSale,
                 showFavorite: showFavorite,
                 isFavorite: isFavorite,
                 onFavoriteTap: onFavoriteTap,
-                showQuickAdd: showQuickAdd && !_isOutOfStock,
+                showQuickAdd: showQuickAdd && !_isOutOfquantity,
                 onQuickAddTap: onQuickAddTap,
                 theme: theme,
               ),
@@ -68,15 +79,16 @@ class ProductCard extends StatelessWidget {
             // ── Info Area ───────────────────────────────────
             _InfoSection(
               name: product.name,
-              originalPrice: product.originalPrice,
-              salePrice: _onSale ? product.salePrice : null,
+              price: product.price,
+              salePrice: product.salePrice,
+              onSale: _onSale,
               isCompact: isCompact,
               theme: theme,
             ),
 
-            // ── Low Stock Strip ─────────────────────────────
-            if (_isLowStock)
-              _LowStockStrip(stock: product.stock!, theme: theme),
+            // ── Low quantity Strip ─────────────────────────────
+            if (_isLowquantity)
+              _LowquantityStrip(quantity: product.quantity, theme: theme),
           ],
         ),
       ),
@@ -87,9 +99,10 @@ class ProductCard extends StatelessWidget {
 // ─── Image Section ────────────────────────────────────────────────────────────
 class _ImageSection extends StatelessWidget {
   final String? imageUrl;
-  final bool isOutOfStock;
+  final bool isOutOfquantity;
   final bool hasBadge;
   final String? badgeText;
+  final bool isSaleBadge;
   final bool showFavorite;
   final bool isFavorite;
   final VoidCallback? onFavoriteTap;
@@ -99,9 +112,10 @@ class _ImageSection extends StatelessWidget {
 
   const _ImageSection({
     required this.imageUrl,
-    required this.isOutOfStock,
+    required this.isOutOfquantity,
     required this.hasBadge,
     required this.badgeText,
+    this.isSaleBadge = false,
     required this.showFavorite,
     required this.isFavorite,
     required this.onFavoriteTap,
@@ -118,19 +132,19 @@ class _ImageSection extends StatelessWidget {
         // Product image
         _ProductImage(imageUrl: imageUrl, theme: theme),
 
-        // Out of stock overlay
-        if (isOutOfStock) const _OutOfStockOverlay(),
+        // Out of Stock overlay
+        if (isOutOfquantity) const _OutOfquantityOverlay(),
 
         // Badge
-        if (hasBadge && !isOutOfStock)
+        if (hasBadge)
           Positioned(
             top: 10,
             left: 10,
-            child: _BadgeChip(text: badgeText!, theme: theme),
+            child: _BadgeChip(text: badgeText!, theme: theme, isSale: isSaleBadge),
           ),
 
         // Favorite button
-        if (showFavorite && !isOutOfStock)
+        if (showFavorite && !isOutOfquantity)
           Positioned(
             top: 8,
             right: 8,
@@ -183,6 +197,15 @@ class _ProductImage extends StatelessWidget {
 
     if (imageUrl == null || imageUrl!.isEmpty) return errorWidget;
 
+    if (imageUrl!.startsWith('assets/')) {
+      return Image.asset(
+        imageUrl!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        errorBuilder: (_, __, ___) => errorWidget,
+      );
+    }
+
     return CachedNetworkImage(
       imageUrl: imageUrl!,
       fit: BoxFit.cover,
@@ -194,8 +217,8 @@ class _ProductImage extends StatelessWidget {
 }
 
 // ─── Out of Stock Overlay ─────────────────────────────────────────────────────
-class _OutOfStockOverlay extends StatelessWidget {
-  const _OutOfStockOverlay();
+class _OutOfquantityOverlay extends StatelessWidget {
+  const _OutOfquantityOverlay();
 
   @override
   Widget build(BuildContext context) {
@@ -209,7 +232,7 @@ class _OutOfStockOverlay extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
           ),
           child: const Text(
-            'OUT OF STOCK',
+            'Out of Stock',
             style: TextStyle(
               color: Colors.white,
               fontSize: 11,
@@ -227,16 +250,30 @@ class _OutOfStockOverlay extends StatelessWidget {
 class _BadgeChip extends StatelessWidget {
   final String text;
   final ThemeData theme;
+  final bool isSale;
 
-  const _BadgeChip({required this.text, required this.theme});
+  const _BadgeChip({required this.text, required this.theme, this.isSale = false});
 
-  Color _badgeColor() => switch (text.toLowerCase()) {
-        'best seller' || 'bestseller' => const Color(0xFF1565C0),
-        'new' || 'new arrival'        => const Color(0xFF2E7D32),
-        'limited' || 'limited edition'=> const Color(0xFF6A1B9A),
-        'sale'                        => const Color(0xFFC62828),
-        _                             => const Color(0xFFE65100),
-      };
+  Color _badgeColor() {
+    if (isSale) return const Color(0xFFC62828); // Red for Sale
+    final lowerText = text.toLowerCase();
+    
+    if (lowerText.contains('sold') || lowerText.contains('out')) {
+      return const Color(0xFFC62828); // Red for Sold/Out
+    }
+    if (lowerText.contains('new')) {
+      return const Color(0xFF1565C0); // Blue for New
+    }
+    if (lowerText.contains('sale') || lowerText.contains('%')) {
+      return const Color(0xFFC62828); // Red for Sale
+    }
+
+    return switch (lowerText) {
+      'best seller' || 'bestseller' => const Color(0xFFE65100), // Orange
+      'limited' || 'limited edition'=> const Color(0xFF6A1B9A), // Purple
+      _                             => const Color(0xFFE65100), // Default Orange
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -338,23 +375,23 @@ class _QuickAddButton extends StatelessWidget {
 // ─── Info Section ─────────────────────────────────────────────────────────────
 class _InfoSection extends StatelessWidget {
   final String name;
-  final double originalPrice;
+  final double price;
   final double? salePrice;
+  final bool onSale;
   final bool isCompact;
   final ThemeData theme;
 
   const _InfoSection({
     required this.name,
-    required this.originalPrice,
+    required this.price,
+    this.salePrice,
+    this.onSale = false,
     required this.isCompact,
     required this.theme,
-    this.salePrice,
   });
 
   @override
   Widget build(BuildContext context) {
-    final onSale = salePrice != null;
-
     return Container(
       color: theme.colorScheme.surface,
       padding: EdgeInsets.fromLTRB(12, isCompact ? 6 : 8, 12, isCompact ? 6 : 8),
@@ -378,16 +415,14 @@ class _InfoSection extends StatelessWidget {
           SizedBox(height: isCompact ? 3 : 5),
 
           // Price row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (onSale) ...[
+          if (onSale) ...[
+            Row(
+              children: [
                 Text(
-                  'Rs ${originalPrice.toStringAsFixed(0)}',
+                  'Rs ${price.toStringAsFixed(0)}',
                   style: TextStyle(
                     decoration: TextDecoration.lineThrough,
-                    decorationColor: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                    color: Colors.grey.shade500,
                     fontSize: isCompact ? 10 : 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -398,32 +433,32 @@ class _InfoSection extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: isCompact ? 13 : 15,
-                    color: theme.colorScheme.error,
+                    color: Colors.red.shade700,
                   ),
                 ),
-              ] else
-                Text(
-                  'Rs ${originalPrice.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: isCompact ? 13 : 15,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-            ],
-          ),
+              ],
+            ),
+          ] else
+            Text(
+              'Rs ${price.toStringAsFixed(0)}',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: isCompact ? 13 : 15,
+                color: theme.colorScheme.primary,
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-// ─── Low Stock Strip ──────────────────────────────────────────────────────────
-class _LowStockStrip extends StatelessWidget {
-  final int stock;
+// ─── Low quantity Strip ──────────────────────────────────────────────────────────
+class _LowquantityStrip extends StatelessWidget {
+  final int quantity;
   final ThemeData theme;
 
-  const _LowStockStrip({required this.stock, required this.theme});
+  const _LowquantityStrip({required this.quantity, required this.theme});
 
   @override
   Widget build(BuildContext context) {
@@ -448,7 +483,7 @@ class _LowStockStrip extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           Text(
-            'Only $stock left!',
+            'Only $quantity left!',
             style: const TextStyle(
               color: Color(0xFFE65100),
               fontSize: 10,

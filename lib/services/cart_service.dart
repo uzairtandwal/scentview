@@ -12,9 +12,16 @@ class CartService with ChangeNotifier {
   List<Product> get items => _items;
   List<Product> get savedItems => _savedItems;
 
-  // ✅ 1. Subtotal (Bina discount ke total price)
+  // ✅ 1. Subtotal (Sale price use karte huye total)
   double get subtotal {
-    return _items.fold(0.0, (sum, current) => sum + (current.salePrice ?? current.originalPrice));
+    return _items.fold(0.0, (sum, current) {
+      final effectivePrice = (current.salePrice != null &&
+              current.salePrice! > 0 &&
+              current.salePrice! < current.price)
+          ? current.salePrice!
+          : current.price;
+      return sum + effectivePrice;
+    });
   }
 
   // ✅ 2. Total Price (Discount nikaal kar final payment)

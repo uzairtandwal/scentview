@@ -15,7 +15,7 @@ class HelpCenterScreen extends StatelessWidget {
     ),
     _FAQItem(
       question: 'Are your perfumes original?',
-      answer: 'Yes, we only stock 100% authentic designer and niche fragrances. Every product is sourced directly from authorized distributors.',
+      answer: 'Yes, we only quantity 100% authentic designer and niche fragrances. Every product is sourced directly from authorized distributors.',
     ),
     _FAQItem(
       question: 'What is the return policy?',

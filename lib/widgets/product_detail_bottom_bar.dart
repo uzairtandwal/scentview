@@ -16,7 +16,7 @@ class ProductDetailBottomBar extends StatelessWidget {
   Future<void> _openWhatsApp(BuildContext context) async {
     final phone = '+923001234567'; // ← replace with your business number
     final msg = Uri.encodeComponent(
-      'Hi! I\'m interested in "${product.name}" — PKR ${product.originalPrice.toStringAsFixed(0)}',
+      'Hi! I\'m interested in "${product.name}" — PKR ${product.price.toStringAsFixed(0)}',
     );
     final uri = Uri.parse('https://wa.me/$phone?text=$msg');
 

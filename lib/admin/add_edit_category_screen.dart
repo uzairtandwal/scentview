@@ -65,13 +65,33 @@ class _AddEditCategoryScreenState extends State<AddEditCategoryScreen> {
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Category ${isUpdating ? 'updated' : 'saved'} successfully!'),
-          backgroundColor: Colors.green,
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.green, size: 28),
+              const SizedBox(width: 12),
+              Text(isUpdating ? 'Category Updated!' : 'Category Created!',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text(
+              'The category "${_nameController.text}" has been ${isUpdating ? 'updated' : 'created'} successfully.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
       );
-      Navigator.of(context).pop();
     }
   } catch (e) {
     if (mounted) {

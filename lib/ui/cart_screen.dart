@@ -16,45 +16,9 @@ class CartScreen extends StatelessWidget {
     return Consumer<CartService>(
       builder: (context, cart, _) {
         final theme = Theme.of(context);
-        final primary = theme.colorScheme.primary;
 
         return Scaffold(
           backgroundColor: theme.colorScheme.surfaceContainerLowest,
-          appBar: AppBar(
-            backgroundColor: theme.colorScheme.surface,
-            elevation: 0,
-            centerTitle: false,
-            title: Text(
-              'Shopping Cart',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: theme.colorScheme.onSurface,
-                letterSpacing: -0.3,
-              ),
-            ),
-            actions: [
-              if (cart.itemCount > 0)
-                Padding(
-                  padding: const EdgeInsets.only(right: 16, top: 12, bottom: 12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '${cart.itemCount} Items',
-                      style: TextStyle(
-                        color: primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
           body: cart.items.isEmpty
               ? _EmptyCart()
               : _CartBody(cart: cart),
@@ -185,8 +149,11 @@ class _CartItemCard extends StatelessWidget {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
     final imageUrl = ApiService.toAbsoluteUrl(product.imageUrl);
-    final price = product.salePrice ?? product.originalPrice;
-    final onSale = product.salePrice != null;
+    
+    final bool onSale = product.salePrice != null &&
+        product.salePrice! > 0 &&
+        product.salePrice! < product.price;
+    final double effectivePrice = onSale ? product.salePrice! : product.price;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -266,17 +233,17 @@ class _CartItemCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      'PKR ${price.toStringAsFixed(0)}',
+                      'PKR ${effectivePrice.toStringAsFixed(0)}',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: primary,
+                        color: onSale ? Colors.red.shade700 : primary,
                       ),
                     ),
                     if (onSale) ...[
                       const SizedBox(width: 6),
                       Text(
-                        'PKR ${product.originalPrice.toStringAsFixed(0)}',
+                        'PKR ${product.price.toStringAsFixed(0)}',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
@@ -326,7 +293,7 @@ class _CartItemCard extends StatelessWidget {
             children: [
               // Subtotal
               Text(
-                'PKR ${(price * quantity).toStringAsFixed(0)}',
+                'PKR ${(effectivePrice * quantity).toStringAsFixed(0)}',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -399,7 +366,7 @@ class _CheckoutSection extends StatelessWidget {
     final theme = Theme.of(context);
     final total = cart.totalPrice;
     // Estimate original total if sale prices exist
-    final hasDiscount = cart.items.any((p) => p.salePrice != null);
+    final hasDiscount = cart.items.any((p) => false);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),

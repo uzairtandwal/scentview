@@ -12,6 +12,7 @@ import 'package:scentview/admin/categories_screen.dart';
 import 'package:scentview/admin/product_form_screen.dart';
 import 'package:scentview/admin/add_edit_banner_screen.dart';
 import 'package:scentview/admin/add_edit_category_screen.dart';
+import 'package:scentview/admin/orders_dashboard.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   static const String routeName = '/admin/dashboard';
@@ -59,7 +60,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     final authService = Provider.of<AuthService>(context, listen: false);
     await authService.signOut();
     if (mounted) {
-      Navigator.of(context).pushNamedAndRemoveUntil('/home-logic', (route) => false);
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Switched to Shop View'), backgroundColor: Color(0xFFFF6B9D)),
       );
@@ -90,15 +91,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         final stats = [
           _StatItem(title: 'Products',   future: _productsFuture,   icon: Icons.shopping_bag_rounded,   iconBg: const Color(0xFFE8F0FE), iconColor: const Color(0xFF4A6CF7), onTap: () => _nav(context, const ProductListScreen())),
           _StatItem(title: 'Categories', future: _categoriesFuture, icon: Icons.category_rounded,        iconBg: const Color(0xFFE6F9F0), iconColor: const Color(0xFF27AE60), onTap: () => _nav(context, const CategoriesScreen())),
-          _StatItem(title: 'Orders',     value: ordersService.orders.isEmpty ? _dummyOrders.length.toString() : ordersService.orders.length.toString(), icon: Icons.receipt_long_rounded,    iconBg: const Color(0xFFFFF3E0), iconColor: const Color(0xFFF39C12), onTap: () => _showComingSoon(context, 'Orders Management')),
-          _StatItem(title: 'Revenue',    value: '\$${ordersService.orders.fold<double>(0, (s, o) => s + o.total).toStringAsFixed(0)}', icon: Icons.attach_money_rounded,    iconBg: const Color(0xFFFCE4EC), iconColor: _primary, onTap: () => _showComingSoon(context, 'Revenue Reports')),
-          _StatItem(title: 'Pending',    value: ordersService.orders.where((o) => o.status.toLowerCase() == 'pending').length.toString(), icon: Icons.pending_actions_rounded, iconBg: const Color(0xFFFDEDED), iconColor: const Color(0xFFE74C3C), onTap: () => _showComingSoon(context, 'Pending Orders')),
+          _StatItem(title: 'Orders',     value: ordersService.orders.isEmpty ? _dummyOrders.length.toString() : ordersService.orders.length.toString(), icon: Icons.receipt_long_rounded,    iconBg: const Color(0xFFFFF3E0), iconColor: const Color(0xFFF39C12), onTap: () => Navigator.pushNamed(context, AdminOrdersDashboard.routeName)),
+          _StatItem(title: 'Revenue',    value: 'Rs ${ordersService.orders.fold<double>(0, (s, o) => s + o.total).toStringAsFixed(0)}', icon: Icons.attach_money_rounded,    iconBg: const Color(0xFFFCE4EC), iconColor: _primary, onTap: () => Navigator.pushNamed(context, AdminOrdersDashboard.routeName)),
+          _StatItem(title: 'Pending',    value: ordersService.orders.where((o) => o.status.toLowerCase() == 'pending').length.toString(), icon: Icons.pending_actions_rounded, iconBg: const Color(0xFFFDEDED), iconColor: const Color(0xFFE74C3C), onTap: () => Navigator.pushNamed(context, AdminOrdersDashboard.routeName)),
         ];
 
         // ── Quick Actions (4 items — 2x2 grid) ─────────────────────
         final actions = [
           _ActionItem(title: 'Add Product',   subtitle: 'Naya product',  icon: Icons.add_box_rounded,            color: const Color(0xFF4A6CF7), onTap: () => _nav(context, const ProductFormScreen())),
-          _ActionItem(title: 'Categories',    subtitle: 'Manage karein', icon: Icons.folder_special_rounded,     color: const Color(0xFF27AE60), onTap: () => _nav(context, const CategoriesScreen())),
+          _ActionItem(title: 'View Orders',   subtitle: 'Manage karein', icon: Icons.receipt_long_rounded,       color: const Color(0xFF27AE60), onTap: () => Navigator.pushNamed(context, AdminOrdersDashboard.routeName)),
           _ActionItem(title: 'Add Banner',    subtitle: 'Upload karein', icon: Icons.add_photo_alternate_rounded,color: _primary,                onTap: () => _nav(context, const AddEditBannerScreen())),
           _ActionItem(title: 'Reports',       subtitle: 'Analytics',     icon: Icons.bar_chart_rounded,          color: const Color(0xFFF39C12), onTap: () => _showComingSoon(context, 'Analytics Reports')),
         ];

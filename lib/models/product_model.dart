@@ -1,179 +1,173 @@
-import 'dart:convert'; // ✅ JSON Encode/Decode ke liye zaroori
-import 'package:scentview/models/category.dart';
-import 'package:scentview/services/api_service.dart';
+import 'dart:convert';
+import 'package:scentview/utils/url_utils.dart';
 
 class Product {
   final dynamic id;
   final String name;
   final String? description;
-  final double originalPrice;
+  final double price;
   final double? salePrice;
   final String imageUrl;
+  final List<String> images;
   final bool isFeatured;
   final bool isSlider;
   final String? badgeText;
-  final String? categoryId;
-  final Category? category;
-  final Map<String, dynamic>? fragranceNotes;
-  final String size;
-  final String scentFamily;
-  final int stock;
-  final List<String>? tags;
+  final String? category;
+  final String? scentFamily;
   final String? brand;
+  final String? size;
+  final int quantity;
+  final String? notesTop;
+  final String? notesMiddle;
+  final String? notesBase;
   final String? sku;
   final bool isActive;
-  final bool hasFreeShipping;
-  final bool isTaxable;
+  final List<String> tags; // Added tags
 
   Product({
     required this.id,
     required this.name,
     this.description,
-    required this.originalPrice,
+    required this.price,
     this.salePrice,
     required this.imageUrl,
+    this.images = const [],
     this.isFeatured = false,
     this.isSlider = false,
     this.badgeText,
-    this.categoryId,
     this.category,
-    this.fragranceNotes,
-    required this.size,
-    required this.scentFamily,
-    required this.stock,
-    this.tags,
+    this.scentFamily,
     this.brand,
+    this.size,
+    this.quantity = 0,
+    this.notesTop,
+    this.notesMiddle,
+    this.notesBase,
     this.sku,
     this.isActive = true,
-    this.hasFreeShipping = false,
-    this.isTaxable = true,
+    this.tags = const [], // Added tags
   });
 
-  // ==================== 1. API PARSING (Jaisa aapka pehle tha) ====================
   factory Product.fromJson(Map<String, dynamic> json) {
-    // Safely handle description
-    String? description;
-    if (json['description'] is String) {
-      description = json['description'];
-    } else if (json['description'] is Map) {
-      description = json['description'].toString();
-    } else {
-      description = json['description']?.toString() ?? '';
+    // Handle images list from JSON
+    List<String> imagesList = [];
+    if (json['image_urls'] != null) {
+      if (json['image_urls'] is List) {
+        imagesList = List<String>.from(json['image_urls']);
+      } else if (json['image_urls'] is String) {
+        try {
+          imagesList = List<String>.from(jsonDecode(json['image_urls']));
+        } catch (_) {}
+      }
     }
 
-    // Safely handle image URL
-    String imageUrl;
-    if (json['main_image_url'] is String) {
-      imageUrl = ApiService.toAbsoluteUrl(json['main_image_url']) ?? '';
-    } else if (json['main_image_url'] is Map) {
-      final Map<String, dynamic> imageMap = json['main_image_url'];
-      String? tempUrl;
-      if (imageMap.containsKey('url')) {
-        tempUrl = imageMap['url']?.toString();
-      } else if (imageMap.containsKey('src')) {
-        tempUrl = imageMap['src']?.toString();
+    // Handle tags list from JSON
+    List<String> tagsList = [];
+    if (json['tags'] != null) {
+      if (json['tags'] is List) {
+        tagsList = List<String>.from(json['tags']);
+      } else if (json['tags'] is String) {
+        try {
+          tagsList = List<String>.from(jsonDecode(json['tags']));
+        } catch (_) {}
       }
-      imageUrl = ApiService.toAbsoluteUrl(tempUrl) ?? imageMap.toString();
-    } else {
-      imageUrl = '';
     }
 
     return Product(
       id: json['id'],
       name: json['name']?.toString() ?? '',
-      description: description,
-      originalPrice: double.tryParse(json['price']?.toString() ?? '0.0') ?? 0.0,
+      description: json['description']?.toString(),
+      price: double.tryParse(json['price']?.toString() ?? '0.0') ?? 0.0,
       salePrice: json['sale_price'] != null ? double.tryParse(json['sale_price'].toString()) : null,
-      imageUrl: imageUrl,
+      imageUrl: UrlUtils.toAbsoluteUrl(json['image_url']?.toString() ?? '') ?? '',
+      images: imagesList,
       isFeatured: json['is_featured'] == 1 || json['is_featured'] == true,
       isSlider: json['is_slider'] == 1 || json['is_slider'] == true,
       badgeText: json['badge_text']?.toString(),
-      categoryId: json['category_id']?.toString(),
-      category: json['category'] != null && json['category'] is Map<String, dynamic>
-          ? Category.fromJson(json['category'])
-          : null,
-      fragranceNotes: json['fragrance_notes'] is Map ? Map<String, dynamic>.from(json['fragrance_notes']) : null,
-      size: json['size']?.toString() ?? '',
-      scentFamily: json['scent_family']?.toString() ?? '',
-      stock: int.tryParse(json['stock']?.toString() ?? '0') ?? 0,
-      tags: json['tags'] != null && json['tags'] is List
-          ? List<String>.from(json['tags'].map((tag) => tag.toString()))
-          : null,
+      category: json['category']?.toString(),
+      scentFamily: json['scent_family']?.toString(),
       brand: json['brand']?.toString(),
+      size: json['size']?.toString(),
+      quantity: int.tryParse(json['quantity']?.toString() ?? '0') ?? 0,
+      notesTop: json['notes_top']?.toString(),
+      notesMiddle: json['notes_middle']?.toString(),
+      notesBase: json['notes_base']?.toString(),
       sku: json['sku']?.toString(),
       isActive: json['is_active'] == 1 || json['is_active'] == true,
-      hasFreeShipping: json['has_free_shipping'] == 1 || json['has_free_shipping'] == true,
-      isTaxable: json['is_taxable'] == 1 || json['is_taxable'] == true,
+      tags: tagsList,
     );
   }
 
-  // ==================== 2. DATABASE PARSING (Offline ke liye) ====================
-  // Ye function SQLite DB se data parh kar Model banata hai
   factory Product.fromMap(Map<String, dynamic> map) {
     return Product(
       id: map['id'],
-      categoryId: map['category_id']?.toString(),
-      name: map['name'],
+      name: map['name'] ?? '',
       description: map['description'],
-      originalPrice: double.tryParse(map['price'].toString()) ?? 0.0,
+      price: double.tryParse(map['price']?.toString() ?? '0.0') ?? 0.0,
       salePrice: map['sale_price'] != null ? double.tryParse(map['sale_price'].toString()) : null,
-      stock: map['stock'] ?? 0,
-      badgeText: map['badge_text'],
+      imageUrl: map['image_url'] ?? '',
+      images: map['images_json'] != null 
+          ? List<String>.from(jsonDecode(map['images_json'])) 
+          : [],
+      category: map['category'],
+      scentFamily: map['scent_family'],
+      brand: map['brand'],
+      size: map['size'],
+      quantity: map['quantity'] ?? 0,
+      notesTop: map['notes_top'],
+      notesMiddle: map['notes_middle'],
+      notesBase: map['notes_base'],
       isFeatured: map['is_featured'] == 1,
-      imageUrl: map['main_image_url'] ?? '',
-      // Complex types (JSON se Map banate hain)
-      fragranceNotes: map['fragrance_notes'] != null ? jsonDecode(map['fragrance_notes']) : null,
-      // Default empty values for fields not in DB schema yet
-      size: '', 
-      scentFamily: '',
-      isSlider: false,
+      tags: map['tags_json'] != null 
+          ? List<String>.from(jsonDecode(map['tags_json'])) 
+          : [],
     );
   }
 
-  // ==================== 3. SAVE TO DATABASE (Offline ke liye) ====================
-  // Ye function Model ko Database format mein convert karta hai
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'category_id': categoryId != null ? int.tryParse(categoryId!) : null,
       'name': name,
       'description': description,
-      'price': originalPrice.toString(),
-      'sale_price': salePrice?.toString(),
-      'stock': stock,
-      'badge_text': badgeText,
-      // SQLite mein boolean nahi hota, 1 ya 0 store karte hain
-      'is_featured': isFeatured ? 1 : 0, 
-      'main_image_url': imageUrl,
-      // Map ko String bana kar save karte hain
-      'fragrance_notes': fragranceNotes != null ? jsonEncode(fragranceNotes) : null,
+      'price': price,
+      'sale_price': salePrice,
+      'image_url': imageUrl,
+      'images_json': jsonEncode(images),
+      'category': category,
+      'scent_family': scentFamily,
+      'brand': brand,
+      'size': size,
+      'quantity': quantity,
+      'notes_top': notesTop,
+      'notes_middle': notesMiddle,
+      'notes_base': notesBase,
+      'is_featured': isFeatured ? 1 : 0,
+      'tags_json': jsonEncode(tags),
     };
   }
 
-  // ==================== 4. SEND TO API (Purana) ====================
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'name': name,
       'description': description,
-      'price': originalPrice,
+      'price': price,
       'sale_price': salePrice,
-      'main_image_url': imageUrl,
+      'image_url': imageUrl,
+      'category': category,
+      'scent_family': scentFamily,
+      'brand': brand,
+      'size': size,
+      'quantity': quantity,
+      'notes_top': notesTop,
+      'notes_middle': notesMiddle,
+      'notes_base': notesBase,
       'is_featured': isFeatured,
       'is_slider': isSlider,
       'badge_text': badgeText,
-      'category_id': categoryId,
-      'category': category?.toMap(),
-      'fragrance_notes': fragranceNotes,
-      'size': size,
-      'scent_family': scentFamily,
-      'stock': stock,
-      'tags': tags,
-      'brand': brand,
       'sku': sku,
       'is_active': isActive,
-      'has_free_shipping': hasFreeShipping,
-      'is_taxable': isTaxable,
+      'tags': tags,
     }..removeWhere((key, value) => value == null);
   }
 
@@ -181,47 +175,47 @@ class Product {
     dynamic id,
     String? name,
     String? description,
-    double? originalPrice,
+    double? price,
     double? salePrice,
     String? imageUrl,
+    List<String>? images,
     bool? isFeatured,
     bool? isSlider,
     String? badgeText,
-    String? categoryId,
-    Category? category,
-    Map<String, dynamic>? fragranceNotes,
-    String? size,
+    String? category,
     String? scentFamily,
-    int? stock,
-    List<String>? tags,
     String? brand,
+    String? size,
+    int? quantity,
+    String? notesTop,
+    String? notesMiddle,
+    String? notesBase,
     String? sku,
     bool? isActive,
-    bool? hasFreeShipping,
-    bool? isTaxable,
+    List<String>? tags,
   }) {
     return Product(
       id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
-      originalPrice: originalPrice ?? this.originalPrice,
+      price: price ?? this.price,
       salePrice: salePrice ?? this.salePrice,
       imageUrl: imageUrl ?? this.imageUrl,
+      images: images ?? this.images,
       isFeatured: isFeatured ?? this.isFeatured,
       isSlider: isSlider ?? this.isSlider,
       badgeText: badgeText ?? this.badgeText,
-      categoryId: categoryId ?? this.categoryId,
       category: category ?? this.category,
-      fragranceNotes: fragranceNotes ?? this.fragranceNotes,
-      size: size ?? this.size,
       scentFamily: scentFamily ?? this.scentFamily,
-      stock: stock ?? this.stock,
-      tags: tags ?? this.tags,
       brand: brand ?? this.brand,
+      size: size ?? this.size,
+      quantity: quantity ?? this.quantity,
+      notesTop: notesTop ?? this.notesTop,
+      notesMiddle: notesMiddle ?? this.notesMiddle,
+      notesBase: notesBase ?? this.notesBase,
       sku: sku ?? this.sku,
       isActive: isActive ?? this.isActive,
-      hasFreeShipping: hasFreeShipping ?? this.hasFreeShipping,
-      isTaxable: isTaxable ?? this.isTaxable,
+      tags: tags ?? this.tags,
     );
   }
 }
